@@ -1,0 +1,15 @@
+{
+  "name": "repo-deep-dive",
+  "description": "Map a codebase into an interactive service map with Claude.",
+  "owner": {
+    "name": "Abhinav Tyagi",
+    "url": "https://github.com/abhinav-08"
+  },
+  "plugins": [
+    {
+      "name": "repo-deep-dive",
+      "source": "./plugins/repo-deep-dive",
+      "description": "Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional interview Q&A pack."
+    }
+  ]
+}

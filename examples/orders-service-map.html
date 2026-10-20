@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders Service Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Service map template. A horizontal mind-map: the root sits on the left, each level opens to the right, decisions (diamonds) open into case nodes, and the selected node's data-flow links are drawn across the branches. The inspector docks on the right (below on narrow screens). All repo-specific content lives in the data block: CFG, D, N, EXTRA, FX. Do not edit this shell per repo; edit the data. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#151c24; --muted:#5a6573; --line:#cdd5de; --wire:#a9b4c1; --grid:#e2e7ec;
+  --svc:#2453a6; --stage:#1f6f63; --step:#5b6472; --decide:#a85a07; --store:#6d3fb0; --ext:#2e7a9a; --warn:#b42318; --system:#151c24; --ok:#2f7d32;
+  --flowin:#6d3fb0; --flowout:#c26a00; --call:#0b7a75;
+  --chip:#e4e9ef; --sel:#fff2cc; --codebg:#f5f7f9; --casebg:#fff8ef; --onaccent:#ffffff;
+  --f-display:"Familjen Grotesk","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e131a; --panel:#151c25; --ink:#e1e7ee; --muted:#95a2b2; --line:#263140; --wire:#3f4d5f; --grid:#161e28;
+  --svc:#7ea7f2; --stage:#55bfac; --step:#aab4c1; --decide:#f0a24a; --store:#b892f5; --ext:#6cc0e0; --warn:#ff7a6b; --system:#e1e7ee; --ok:#7cc47f;
+  --flowin:#b892f5; --flowout:#f0a24a; --call:#4fd1c5;
+  --chip:#1d2632; --sel:#2e2a17; --codebg:#10171f; --casebg:#1f1a12; --onaccent:#0e131a; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --panel:#151c25; --ink:#e1e7ee; --muted:#95a2b2; --line:#263140; --wire:#3f4d5f; --grid:#161e28;
+  --svc:#7ea7f2; --stage:#55bfac; --step:#aab4c1; --decide:#f0a24a; --store:#b892f5; --ext:#6cc0e0; --warn:#ff7a6b; --system:#e1e7ee; --ok:#7cc47f;
+  --flowin:#b892f5; --flowout:#f0a24a; --call:#4fd1c5;
+  --chip:#1d2632; --sel:#2e2a17; --codebg:#10171f; --casebg:#1f1a12; --onaccent:#0e131a; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.5 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1680px;margin:0 auto;display:grid;gap:12px}
+h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance}
+h1{font-size:clamp(26px,3.4vw,36px);letter-spacing:-.01em}
+.lede{color:var(--muted);max-width:95ch;margin:4px 0 0}
+.lbl{font:600 11px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,input,select{font:inherit;color:inherit}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 11px;cursor:pointer;font-size:14px}
+.btn:hover{border-color:var(--svc)}
+.btn[aria-pressed="true"]{background:var(--svc);color:var(--onaccent);border-color:var(--svc)}
+input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 10px;width:240px;max-width:100%;font-size:14px}
+:focus-visible{outline:2px solid var(--decide);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.mk{width:12px;height:12px;display:inline-block;flex:none;border-radius:3px}
+.mk.system{background:var(--system)} .mk.service{background:var(--svc)} .mk.stage{background:var(--stage)} .mk.step{background:var(--step)}
+.mk.decision{background:var(--decide);transform:rotate(45deg) scale(.82);border-radius:1px}
+.mk.store{background:var(--store);border-radius:50%/30%} .mk.external{background:transparent;border:2.5px solid var(--ext)}
+.mk.case{background:var(--casebg);border:2px dashed var(--decide)}
+.ln{width:22px;height:0;border-top:2px dashed;display:inline-block}
+.ln.in{border-color:var(--flowin)} .ln.out{border-color:var(--flowout)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:14px;align-items:start}
+@media (max-width:1150px){.layout{grid-template-columns:1fr}}
+.mapstage{position:relative;height:min(80vh,900px);min-height:460px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;
+  background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:22px 22px}
+.mapstage.drag{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;-webkit-user-select:none;user-select:none}
+svg.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.wire{fill:none;stroke:var(--wire);stroke-width:1.6}
+.wire.cw{stroke-dasharray:3 4;stroke:var(--decide);opacity:.6}
+.flow{fill:none;stroke-width:2;stroke-dasharray:6 5}
+.flow.in{stroke:var(--flowin)} .flow.out{stroke:var(--flowout)}
+.flowlbl{font:600 11px var(--f-mono);paint-order:stroke;stroke:var(--panel);stroke-width:4px}
+.flowlbl.in{fill:var(--flowin)} .flowlbl.out{fill:var(--flowout)}
+@media (prefers-reduced-motion:no-preference){.nd{transition:left .25s ease,top .25s ease,opacity .2s}}
+.nd{position:absolute;width:240px;height:60px;display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.nd .stripe{width:5px;border-radius:7px 0 0 7px;flex:none}
+.nd.k-system .stripe{background:var(--system)} .nd.k-service .stripe{background:var(--svc)} .nd.k-stage .stripe{background:var(--stage)}
+.nd.k-step .stripe{background:var(--step)} .nd.k-decision .stripe{background:var(--decide)} .nd.k-store .stripe{background:var(--store)} .nd.k-external .stripe{background:var(--ext)}
+.nd.k-case{background:var(--casebg);border:1.5px dashed color-mix(in srgb,var(--decide) 60%,var(--line))}
+.nd.k-case .stripe{background:transparent}
+.nd.k-case .t{font:600 12px/1.25 var(--f-mono);color:var(--decide)}
+.nd.k-decision{height:96px;background:transparent;border:0;box-shadow:none;border-radius:0}
+.nd.k-decision .stripe{display:none}
+.dshape{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.dshape polygon{fill:var(--panel);stroke:color-mix(in srgb,var(--decide) 75%,var(--line));stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.nd.k-decision .body{position:relative;z-index:1;padding:0 56px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:3px;border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.nd.k-decision .t{white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:12.5px;line-height:1.2}
+.nd.k-decision .s{display:none}
+.nd.k-decision .meta{justify-content:center;margin-top:0}
+.nd.k-decision .body:focus-visible{outline:none}
+.nd .body{flex:1;min-width:0;background:none;border:0;text-align:left;padding:6px 8px;cursor:pointer;border-radius:0 8px 8px 0}
+.nd .t{display:block;font:700 13.5px/1.25 var(--f-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd.k-service .t{color:var(--svc)} .nd.k-system .t{font-size:15px}
+.nd .s{display:block;font-size:12px;line-height:1.3;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd .meta{display:flex;gap:4px;margin-top:2px}
+.pill{font:600 10px/1 var(--f-mono);padding:2px 4px;border-radius:3px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.pill.w{background:var(--warn);color:var(--onaccent)}
+.pill.call{background:var(--call);color:var(--onaccent)}
+.pill.fx{background:var(--decide);color:var(--onaccent)}
+.pill.if{background:var(--chip);color:var(--decide);border:1px solid color-mix(in srgb,var(--decide) 40%,transparent)}
+.nd .tg{position:absolute;right:-13px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;border:1.5px solid var(--wire);background:var(--panel);font:600 11px/1 var(--f-mono);color:var(--muted);cursor:pointer;display:grid;place-items:center;padding:0;z-index:2}
+.nd .tg.open{color:var(--ink);border-color:var(--ink)}
+.nd .tg.cases{border-style:dashed;border-color:var(--decide);color:var(--decide)}
+.nd.sel{box-shadow:0 0 0 2.5px var(--decide);background:var(--sel)}
+.nd.fin{box-shadow:0 0 0 2px var(--flowin)} .nd.fout{box-shadow:0 0 0 2px var(--flowout)}
+.nd.hit{box-shadow:0 0 0 2.5px var(--store)}
+.nd.k-decision.sel,.nd.k-decision.fin,.nd.k-decision.fout,.nd.k-decision.hit{box-shadow:none;background:transparent}
+.nd.k-decision.sel .dshape polygon{fill:var(--sel);stroke:var(--decide);stroke-width:3}
+.nd.k-decision.fin .dshape polygon{stroke:var(--flowin);stroke-width:2.6}
+.nd.k-decision.fout .dshape polygon{stroke:var(--flowout);stroke-width:2.6}
+.nd.k-decision.hit .dshape polygon{stroke:var(--store);stroke-width:3}
+.nd.k-decision:has(.body:focus-visible) .dshape polygon{stroke:var(--decide);stroke-width:3;stroke-dasharray:5 3}
+.zoombar{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;z-index:5;background:var(--panel);padding:4px;border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.zoombar .btn{padding:6px 12px;font:600 15px var(--f-mono);min-width:40px}
+.zoombar .zl{min-width:66px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:default}
+.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);z-index:5;background:var(--panel);padding:3px 8px;border-radius:5px;border:1px solid var(--line)}
+.insp{position:sticky;top:max(12px,env(safe-area-inset-top,0px));max-height:calc(100vh - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:16px;min-width:0}
+@media (max-width:1150px){.insp{position:static;max-height:none}}
+.crumbs{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px}
+.crumbs button{background:none;border:0;padding:0;color:var(--svc);cursor:pointer;font:inherit}
+.insp h2{font-size:21px}
+.kindtag{font:600 10.5px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:4px;background:var(--chip);color:var(--muted)}
+.desc{margin:0;max-width:72ch}
+.sec{display:grid;gap:6px;min-width:0}
+.sec>h3{font:600 11px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+ol.steps{margin:0;padding-left:20px;display:grid;gap:4px}
+.io{display:grid;gap:6px}
+.item{border:1px solid var(--line);border-radius:8px;background:var(--codebg);min-width:0}
+.item summary{cursor:pointer;padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;list-style:none}
+.item summary::-webkit-details-marker{display:none}
+.item summary::before{content:"▸";color:var(--muted);font-size:12px}
+.item[open] summary::before{content:"▾"}
+.dn{font:600 13px var(--f-mono);color:var(--store)}
+.dd{color:var(--muted);font-size:13.5px}
+.links{padding:0 10px 10px;display:grid;gap:6px;font-size:13.5px}
+.links b{font-weight:600}
+.lk{background:none;border:0;padding:0;color:var(--svc);cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:2px;text-align:left}
+pre{margin:0;background:var(--codebg);border:1px solid var(--line);border-radius:6px;padding:9px 11px;overflow-x:auto;font:12px/1.55 var(--f-mono);color:var(--ink)}
+pre .kw{color:var(--decide);font-weight:600} pre .cm{color:var(--muted);font-style:italic}
+.casebtn{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.25fr);gap:8px;font-size:13.5px;padding:8px 9px;border-radius:6px;background:var(--casebg);border:1px dashed color-mix(in srgb,var(--decide) 45%,var(--line));text-align:left;cursor:pointer;width:100%}
+.casebtn .c{font-family:var(--f-mono);font-size:12px;color:var(--decide);overflow-wrap:anywhere;min-width:0}
+.casebtn .a{color:var(--muted)} .casebtn .r{min-width:0}
+.casebtn .x{grid-column:1/-1;color:var(--muted);font-size:13px;border-top:1px dotted var(--line);padding-top:5px}
+.casebtn.cur{outline:2px solid var(--decide)}
+.callcard{border:1px solid color-mix(in srgb,var(--call) 55%,var(--line));border-radius:8px;padding:10px 12px;display:grid;gap:8px;background:color-mix(in srgb,var(--call) 6%,var(--panel))}
+.callcard .callh{display:flex;gap:8px;align-items:center}
+.calltag{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--onaccent);background:var(--call);padding:3px 7px;border-radius:4px}
+.callcard dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;margin:0;font-size:13.5px}
+.callcard dt{color:var(--muted);font-weight:600} .callcard dd{margin:0;overflow-wrap:anywhere}
+.callcard h4{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.callcard p{margin:0;font-size:13.5px}
+.fxcard{border:1px solid color-mix(in srgb,var(--decide) 45%,var(--line));border-radius:8px;padding:12px;display:grid;gap:10px;background:var(--panel);min-width:0}
+.fxcard .fxh{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fxtag{font:700 12px var(--f-mono);color:var(--onaccent);background:var(--decide);padding:2px 7px;border-radius:4px}
+.fxcard h4{font-size:15px}
+.fxcard .fxd{margin:0;font-size:13.5px;color:var(--muted)}
+.fxin{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 12px}
+.fxin label{display:grid;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
+.fxin label.ck{display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px}
+.fxin label.wide{grid-column:1/-1}
+.fxin input[type=text],.fxin input[type=number],.fxin select{border:1px solid var(--line);background:var(--codebg);border-radius:5px;padding:5px 7px;font-size:13.5px;width:100%;min-width:0}
+.fxin input[type=range]{width:100%;accent-color:var(--decide)}
+.rv{font:600 12px var(--f-mono);color:var(--ink)}
+table.fxout{border-collapse:collapse;width:100%;font-size:13.5px}
+table.fxout th{text-align:left;font-weight:400;color:var(--muted);padding:4px 8px 4px 0;vertical-align:top;width:46%}
+table.fxout td{padding:4px 0;font-weight:600;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+table.fxout td.mono{font:500 12px var(--f-mono)}
+table.fxout td.ok{color:var(--ok)} table.fxout td.warn{color:var(--decide)} table.fxout td.bad{color:var(--warn)}
+table.mini{border-collapse:collapse;font:12px var(--f-mono);margin-top:4px}
+table.mini th{color:var(--muted);font-weight:400;padding:3px 8px 3px 0;text-align:left}
+table.mini td{border:1px solid var(--line);padding:3px 7px;text-align:center}
+table.mini td.hl{background:var(--decide);color:var(--onaccent)}
+.fxsvg{width:100%;height:auto;display:block}
+.fxsvg .curve{fill:none;stroke:var(--decide);stroke-width:2}
+.fxsvg .guide{stroke:var(--line);stroke-dasharray:3 3}
+.fxsvg .dot{fill:var(--svc)}
+.fxsvg .axl,.fxsvg .segl{font:11px var(--f-mono);fill:var(--muted)}
+.fxsvg .seg.good{fill:var(--ok)} .fxsvg .seg.bad{fill:var(--warn)} .fxsvg .seg.wait{fill:var(--line)}
+.trace{margin:0;padding-left:18px;font:12.5px/1.5 var(--f-mono);color:var(--ink)}
+.fxnote{margin:0;font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding-left:8px}
+.ev{font:12px var(--f-mono);color:var(--muted);overflow-wrap:anywhere}
+.conf{font:600 10.5px var(--f-body);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);padding:6px 10px;background:var(--codebg);border-radius:0 6px 6px 0;font-size:14px}
+.calls{display:grid;gap:6px}
+.call{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;font-size:14px;align-items:baseline}
+.call .to{font-weight:600}
+.lineage{display:grid;gap:8px}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,2fr);gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:14px}
+.lrow .h{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:14px;align-items:start}
+.usedat{font-size:13px;color:var(--muted)}
+@media (max-width:700px){.lrow{grid-template-columns:1fr}.casebtn{grid-template-columns:1fr}.casebtn .a{display:none}}
+.foot{color:var(--muted);font-size:13px;max-width:95ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="lbl" id="kicker"></div>
+    <h1 id="ttl"></h1>
+    <p class="lede" id="lede"></p>
+  </header>
+
+  <div class="bar">
+    <button class="btn" id="vTree" aria-pressed="true">Map</button>
+    <button class="btn" id="vFx" aria-pressed="false">Formulas</button>
+    <button class="btn" id="vLin" aria-pressed="false">Data lineage table</button>
+    <span style="flex:1"></span>
+    <button class="btn" id="flowBtn" aria-pressed="true">Data flow lines</button>
+    <button class="btn" id="expAll">Expand all</button>
+    <button class="btn" id="colAll">Services only</button>
+    <label class="lbl" for="q">Find</label>
+    <input type="search" id="q" placeholder="Find…">
+  </div>
+  <div class="legend" id="legend"></div>
+
+  <div id="main"></div>
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+/* ======================= HELPERS (usable from the data block) ======================= */
+const L=String.raw;                       // L`...` keeps backslashes (regexes, paths) in logic blocks; ${} still interpolates
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(x,d=3)=>{ if(!isFinite(x)) return String(x); if(Math.abs(x)>=1000) return Math.round(x).toLocaleString("en-US");
+  let s=(+x).toFixed(d); if(s.includes(".")) s=s.replace(/0+$/,"").replace(/\.$/,""); return s; };   // never strips integer zeros
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+// Timeline: segs [{a,b,label,cls:"good"|"bad"|"wait"}] on 0..total
+function bars(segs,total,unit="ms",aria="Timeline"){
+  const W=420,H=18*segs.length+26, sx=x=>12+(W-24)*x/total; let g="";
+  segs.forEach((s,i)=>{ const y=8+i*18; const right=sx(s.b)+4+s.label.length*6.6<=W+4;
+    g+=`<rect x="${sx(s.a)}" y="${y}" width="${Math.max(2,sx(s.b)-sx(s.a))}" height="12" rx="2" class="seg ${s.cls}"/><text x="${right?sx(s.b)+4:sx(s.a)-4}" y="${y+10}" class="segl" text-anchor="${right?"start":"end"}">${esc(s.label)}</text>`; });
+  for(let i=0;i<=4;i++){ const t=total*i/4; g+=`<text x="${sx(t)}" y="${H-4}" class="axl" text-anchor="${i===0?"start":i===4?"end":"middle"}">${fmt(Math.round(t),0)} ${unit}</text>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" class="fxsvg" role="img" aria-label="${esc(aria)}">${g}</svg>`; }
+// Curve of y=f(x) on [lo,hi] with an optional marker at x and labelled vertical guides.
+// plot({f, lo, hi, x, guides:[{x,label}], ylo, yhi, xl:"unit", aria})
+function plot(o){
+  const W=420,H=130,lo=o.lo,hi=o.hi,n=o.n||80,pts=[];
+  for(let i=0;i<=n;i++){ const x=lo+(hi-lo)*i/n; pts.push([x,o.f(x)]); }
+  const ylo=o.ylo??Math.min(0,...pts.map(p=>p[1])), yhi=o.yhi??Math.max(...pts.map(p=>p[1]));
+  const sx=x=>10+(W-20)*(x-lo)/((hi-lo)||1), sy=y=>H-22-(H-36)*(y-ylo)/((yhi-ylo)||1);
+  let g=`<path d="${pts.map((p,i)=>(i?"L":"M")+sx(p[0]).toFixed(1)+","+sy(p[1]).toFixed(1)).join("")}" class="curve"/>`;
+  (o.guides||[]).forEach(q=>{ g+=`<line x1="${sx(q.x)}" x2="${sx(q.x)}" y1="${sy(ylo)}" y2="${sy(yhi)}" class="guide"/>${q.label?`<text x="${sx(q.x)+4}" y="24" class="axl">${esc(q.label)}</text>`:""}`; });
+  if(o.x!==undefined){ const px=clamp(o.x,lo,hi); g+=`<circle cx="${sx(px)}" cy="${sy(o.f(px))}" r="4" class="dot"/>`; }
+  g+=`<text x="${sx(lo)}" y="${H-4}" class="axl">${fmt(lo)}${o.xl?" "+esc(o.xl):""}</text><text x="${sx(hi)}" y="${H-4}" class="axl" text-anchor="end">${fmt(hi)}</text><text x="12" y="12" class="axl">${fmt(yhi)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="fxsvg" role="img" aria-label="${esc(o.aria||"Function plot")}">${g}</svg>`; }
+
+/* ======================= DATA BLOCK =======================
+   Must declare: CFG, D, N, EXTRA, FX (use {} when empty). Do not redeclare the helpers above. */
+/* Sample data block: a tiny fictional orders platform that exercises every field. Replace all of it per repo. */
+const CFG={
+  title:"Orders Service Map",                     // h1 (the <title> comes from build_svcmap.py --title)
+  kicker:"Example · checkout-api and fulfilment",  // small caps line above the title
+  find:"cart, retry, coupon…",                     // search box placeholder
+  key:"orders-map",                                // localStorage namespace for the last selection
+  open:["root","api","api_val"],                   // nodes open on first load
+  sel:"api_cartok"                                 // node selected on first load
+  // lede:"...", foot:"..."                         // optional HTML; sensible defaults otherwise
+};
+const D={
+  req:{n:"checkout request",d:"POST /v1/checkout with cartId, coupon and a payment token",s:`{ cartId:"c-91", coupon:"SAVE10", paymentToken:"tok_..." }`},
+  cart:{n:"cart",d:"Cart rows with prices, loaded from Postgres",s:`{ id, userId, items:[{ sku, qty, unitPrice }], currency }`},
+  total:{n:"order total",d:"Subtotal minus coupon, plus tax"},
+  pay:{n:"payment result",d:"Gateway authorization id or a decline code"},
+  evt:{n:"OrderPlaced event",d:"Kafka message consumed by fulfilment",s:`topic orders.v1, key = orderId
+{ orderId, userId, total, items[] }`}
+};
+const N={id:"root",k:"system",t:"Orders Platform",s:"example data for the template",
+ d:"Click the root toggle to open every level at once.",kids:[
+ {id:"web",k:"external",t:"Web and app clients",out:["req"],c:"Doc"},
+ {id:"api",k:"service",t:"checkout-api",s:"Spring Boot · 6 pods",
+  calls:[["PostgreSQL","cart reads, 200 ms statement timeout"],["payments-gw","authorize, 2 s per try, 3 tries"],["Kafka","publish orders.v1"]],kids:[
+  {id:"api_val",k:"stage",t:"Validate",kids:[
+   {id:"api_load",k:"step",t:"Load cart",s:"CartRepository.findById",in:["req"],out:["cart"],ev:"CartRepository.java:41",c:"Code"},
+   {id:"api_cartok",k:"decision",t:"Cart usable?",in:["cart"],
+    br:[["cart == null","404 CART_NOT_FOUND"],["cart.items empty","400 EMPTY_CART"],["otherwise","continue to pricing"]],ev:"CheckoutService.java:58-71",c:"Code"}]},
+  {id:"api_price",k:"stage",t:"Price and pay",kids:[
+   {id:"api_total",k:"step",t:"Compute total",in:["cart"],out:["total"],ev:"PricingService.java:22-40",c:"Code"},
+   {id:"api_pay",k:"external",t:"Authorize payment",s:"payments-gw POST /authorize",in:["total"],out:["pay"],
+    warn:"Retries a non-idempotent call without an idempotency key.",ev:"PaymentClient.java:30-77",c:"Code"},
+   {id:"api_pub",k:"step",t:"Publish OrderPlaced",in:["pay","total"],out:["evt"],ev:"OrderEvents.java:19",c:"Code"}]},
+  {id:"pg",k:"store",t:"orders-db (Postgres)",s:"carts, cart_items, orders",out:["cart"],c:"Code"}]},
+ {id:"ful",k:"service",t:"fulfilment",s:"Kafka consumer group fulfilment-v2",kids:[
+  {id:"ful_consume",k:"step",t:"Consume OrderPlaced",in:["evt"],uses:"Creates one pick list per warehouse.",c:"Doc"}]}
+]};
+const EXTRA={
+ api_load:{what:["Reads the cart and its items in one query.","Prices come from the cart rows, not from the catalogue."],
+  ext:{sys:"PostgreSQL",tag:"SQL",cluster:"orders-db primary",target:"carts, cart_items",api:"SELECT with JOIN",when:"every checkout",
+   timeout:"200 ms statement timeout, no retry",req:L`SELECT c.id, i.sku, i.qty, i.unit_price
+FROM carts c JOIN cart_items i ON i.cart_id = c.id
+WHERE c.id = :cartId`,resp:"Rows mapped to Cart; an empty result means the cart is missing.",conf:"Code"}},
+ api_cartok:{what:["Rejects missing or empty carts before any pricing work."],
+  logic:L`if (cart == null)              throw NotFound("CART_NOT_FOUND")   // 404
+else if (cart.items.isEmpty()) throw BadRequest("EMPTY_CART")      // 400
+// otherwise fall through to pricing`,
+  brx:["The client shows 'cart expired'.","The client returns to the catalogue.","Pricing runs next."]},
+ api_total:{what:["Sums qty × unit price, applies the coupon, then adds tax on the discounted amount."],fx:["total"]},
+ api_pay:{what:["Calls the gateway; on timeout it waits 200 ms × 2^n and tries again, up to 3 tries."],fx:["retry"],
+  ext:[{sys:"HTTP",tag:"HTTP",target:"payments-gw POST /authorize",when:"after pricing",timeout:"2 s per try, 3 tries, backoff 200 ms × 2^n",conf:"Code"}]},
+ api_pub:{what:["Publishes once the payment is authorized; key = orderId keeps an order on one partition."],
+  ext:{sys:"Kafka",tag:"KAFKA",target:"topic orders.v1",api:"KafkaTemplate.send",when:"payment authorized",notes:"acks=all from the producer config.",conf:"Code"}}
+};
+const FX={
+ total:{t:"Order total",conf:"Code",d:"Subtotal minus coupon (capped), then tax on the discounted amount.",
+  inp:[{id:"sub",type:"num",label:"Subtotal",v:120},{id:"cp",type:"select",label:"Coupon",v:"10",opts:[["0","none"],["10","SAVE10 (10%)"],["25","SAVE25 (25%)"]]},
+       {id:"tax",type:"range",label:"Tax rate %",min:0,max:20,step:0.5,v:5},{id:"cap",type:"check",label:"Cap discount at 20",v:true}],
+  run(v){ let disc=v.sub*(+v.cp)/100; if(v.cap) disc=Math.min(disc,20); const net=v.sub-disc, tax=net*v.tax/100;
+   return {rows:[["Discount",fmt(disc)],["Taxable amount",fmt(net)],["Tax",fmt(tax)],["Total",fmt(net+tax),"ok"]],
+    svg:plot({f:x=>(x-(v.cap?Math.min(x*(+v.cp)/100,20):x*(+v.cp)/100))*(1+v.tax/100),lo:0,hi:Math.max(200,v.sub*1.5),x:v.sub,xl:"subtotal",aria:"Total against subtotal"}),
+    note:"The cap applies before tax."}; }},
+ retry:{t:"Payment retry timeline",conf:"Code",d:"3 tries, 2 s timeout each, 200 ms × 2^n wait between tries.",
+  inp:[{id:"lat",type:"range",label:"Gateway latency (ms)",min:100,max:3000,step:50,v:2500}],
+  run(v){ const segs=[]; let t=0, ok=false;
+   for(let i=0;i<3&&!ok;i++){ const d=Math.min(v.lat,2000); ok=v.lat<=2000;
+    segs.push({a:t,b:t+d,label:"try "+(i+1)+(ok?" ok":" timeout"),cls:ok?"good":"bad"}); t+=d;
+    if(!ok&&i<2){ const w=200*2**i; segs.push({a:t,b:t+w,label:"wait "+w+" ms",cls:"wait"}); t+=w; } }
+   return {rows:[["Outcome",ok?"authorized":"failed after 3 tries",ok?"ok":"bad"],["Time spent",fmt(t)+" ms"]],
+    svg:bars(segs,Math.max(t,1),"ms","Payment retry timeline"),trace:segs.map(s=>s.label+": "+fmt(s.a)+" to "+fmt(s.b)+" ms")}; }}
+};
+
+
+/* ======================= INDEX ======================= */
+const byId={}, parentOf={}, producers={}, consumers={};
+(function walk(n,p){
+  const x=EXTRA[n.id]; if(x){ if(x.patch) Object.assign(n,x.patch); ["what","logic","ext","es","fx","brx","warn","uses","ev","c"].forEach(k=>{ if(x[k]!==undefined) n[k]=x[k]; }); }
+  if(n.es&&!n.ext) n.ext={sys:"Elasticsearch",tag:"ES",...n.es};      // older data used es:{...}
+  if(n.ext&&!Array.isArray(n.ext)) n.ext=[n.ext];
+  if(n.br && !(n.kids&&n.kids.length)){ n.cases=true; n.kids=n.br.map((b,i)=>({id:n.id+"__c"+i,k:"case",t:b[0],s:b[1],caseOf:n.id,ci:i,x:(n.brx||[])[i]})); }
+  byId[n.id]=n; if(p) parentOf[n.id]=p.id;
+  (n.out||[]).forEach(x=>(producers[x]=producers[x]||[]).push(n.id));
+  (n.in||[]).forEach(x=>(consumers[x]=consumers[x]||[]).push(n.id));
+  (n.kids||[]).forEach(k=>walk(k,n)); })(N,null);
+const usedAt={}; Object.values(byId).forEach(n=>(n.fx||[]).forEach(f=>(usedAt[f]=usedAt[f]||[]).push(n.id)));
+
+const ROOT=N.id, SKEY=(CFG.key||"svcmap")+".sel";
+const st={open:new Set(CFG.open||[ROOT]),sel:(CFG.sel&&byId[CFG.sel])?CFG.sel:ROOT,view:"map",q:"",flow:true,tx:24,ty:24,k:0.85};
+try{const s=localStorage.getItem(SKEY); if(s&&byId[s]) st.sel=s;}catch(e){}
+const W=240,H=60,HD=96,CG=78,RG=12;
+const hOf=n=>n.k==="decision"?HD:H;            // decisions are drawn as taller diamonds
+
+function ancestors(id){const a=[];let p=parentOf[id];while(p){a.unshift(p);p=parentOf[p];}return a;}
+function descendants(n,acc=[]){(n.kids||[]).forEach(k=>{acc.push(k.id);descendants(k,acc);});return acc;}
+function nodeText(n){return [n.t,n.s,n.d,n.uses,n.warn,n.logic,(n.what||[]).join(" "),n.ext?JSON.stringify(n.ext):"",(n.fx||[]).map(f=>FX[f]?FX[f].t:"").join(" "),(n.in||[]).join(" "),(n.out||[]).map(o=>o+" "+(D[o]?D[o].n:"")).join(" "),(n.br||[]).map(b=>b.join(" ")).join(" ")].join(" ").toLowerCase();}
+function repOf(id){ const chain=[...ancestors(id),id]; let rep=ROOT;
+  for(const a of chain){ if(a===ROOT){rep=ROOT;continue;} if(st.open.has(parentOf[a])) rep=a; else break; } return rep; }
+
+/* ---------- layout ---------- */
+let POS={};
+function layout(){
+  POS={}; let y=0; const order=[];
+  (function place(n,d){
+    const h=hOf(n), x=d*(W+CG), kids=(n.kids&&st.open.has(n.id))?n.kids:[];
+    if(!kids.length){ POS[n.id]={x,y,h}; order.push(n.id); y+=h+RG; return; }
+    const startY=y, from=order.length;
+    kids.forEach(k=>place(k,d+1));
+    const f=POS[kids[0].id], l=POS[kids[kids.length-1].id];
+    let top=(f.y+f.h/2+l.y+l.h/2)/2-h/2;                       // centre the parent on its children
+    if(top<startY){ const dy=startY-top; order.slice(from).forEach(id=>POS[id].y+=dy); y+=dy; top=startY; }  // tall parent, short children
+    POS[n.id]={x,y:top,h}; order.push(n.id); y=Math.max(y,top+h+RG);
+  })(N,0);
+  return y;
+}
+
+/* ---------- flow ---------- */
+function flowEdges(){
+  const n=byId[st.sel]; if(!n||!st.flow) return [];
+  const E=[], seen=new Set(), me=repOf(n.id);
+  (n.in||[]).forEach(d=>(producers[d]||[]).forEach(p=>{ if(p===n.id) return; const a=repOf(p); if(a===me) return; const key="i"+a+d; if(seen.has(key)) return; seen.add(key); E.push({from:a,to:me,d,dir:"in"}); }));
+  (n.out||[]).forEach(d=>(consumers[d]||[]).forEach(c=>{ if(c===n.id) return; const b=repOf(c); if(b===me) return; const key="o"+b+d; if(seen.has(key)) return; seen.add(key); E.push({from:me,to:b,d,dir:"out"}); }));
+  const M={}; E.forEach(e=>{const k=e.dir+e.from+">"+e.to; (M[k]=M[k]||{...e,ds:[]}).ds.push(D[e.d]?D[e.d].n:e.d);});
+  return Object.values(M);
+}
+function curve(a,b){
+  const x1=a.x+W, y1=a.y+a.h/2, x2=b.x, y2=b.y+b.h/2;
+  if(x2>x1+10){ const m=(x1+x2)/2; return {p:`M${x1},${y1} C${m},${y1} ${m},${y2} ${x2},${y2}`, mx:m, my:(y1+y2)/2}; }
+  const r=Math.max(x1,b.x+W)+60, l=Math.min(a.x,x2)-60;
+  return {p:`M${x1},${y1} C${r},${y1} ${r},${(y1+y2)/2} ${(x1+x2)/2},${(y1+y2)/2} S${l},${y2} ${x2},${y2}`, mx:(x1+x2)/2, my:(y1+y2)/2};
+}
+
+/* ---------- formula widgets ---------- */
+const FXSTATE={};
+function fxState(id){ return FXSTATE[id]||(FXSTATE[id]=Object.fromEntries(FX[id].inp.map(i=>[i.id,i.v]))); }
+function fxCard(id){
+  const f=FX[id]; if(!f) return ""; const s=fxState(id);
+  const inputs=f.inp.map(i=>{ const v=s[i.id]; const a=`data-fx="${id}" data-in="${i.id}" id="fx-${id}-${i.id}"`;
+    if(i.type==="check") return `<label class="ck"><input type="checkbox" ${a} ${v?"checked":""}>${esc(i.label)}</label>`;
+    if(i.type==="select") return `<label>${esc(i.label)}<select ${a}>${i.opts.map(o=>`<option value="${esc(o[0])}" ${String(v)===String(o[0])?"selected":""}>${esc(o[1])}</option>`).join("")}</select></label>`;
+    if(i.type==="range") return `<label class="wide">${esc(i.label)} <span class="rv" data-rv="${id}-${i.id}">${esc(v)}</span><input type="range" ${a} min="${i.min}" max="${i.max}" step="${i.step}" value="${esc(v)}"></label>`;
+    if(i.type==="num") return `<label>${esc(i.label)}<input type="number" ${a} value="${esc(v)}" step="any"></label>`;
+    return `<label class="wide">${esc(i.label)}<input type="text" ${a} value="${esc(v)}"></label>`; }).join("");
+  const used=(usedAt[id]||[]).map(n=>`<button class="lk" data-go="${n}">${esc(byId[n].t)}</button>`).join(", ");
+  return `<div class="fxcard"><div class="fxh"><span class="fxtag">ƒ</span><h4>${esc(f.t)}</h4><span class="conf">${esc(f.conf)}</span></div>
+    <p class="fxd">${esc(f.d)}</p><div class="fxin">${inputs}</div><div data-fxout="${id}"></div>${st.view==="fx"&&used?`<div class="usedat">Used at: ${used}</div>`:""}</div>`;
+}
+function fxRender(id,res){
+  const rows=(res.rows||[]).map(r=>`<tr><th>${esc(r[0])}</th><td class="${esc(r[2]||"")}">${esc(r[1])}</td></tr>`).join("");
+  const h=`<table class="fxout">${rows}</table>${res.html||""}${res.svg||""}${res.trace&&res.trace.length?`<ol class="trace">${res.trace.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>`:""}${res.note?`<p class="fxnote">${esc(res.note)}</p>`:""}`;
+  document.querySelectorAll(`[data-fxout="${id}"]`).forEach(el=>el.innerHTML=h);
+}
+function fxRun(id){ let res; try{ res=FX[id].run({...fxState(id)}); }catch(e){ res={rows:[["Error",String(e.message||e),"bad"]]}; }
+  if(res&&typeof res.then==="function") res.then(r=>fxRender(id,r)).catch(e=>fxRender(id,{rows:[["Error",String(e),"bad"]]})); else fxRender(id,res); }
+function runVisibleFx(){ const ids=new Set([...document.querySelectorAll("[data-fxout]")].map(e=>e.dataset.fxout)); ids.forEach(fxRun); }
+document.addEventListener("input",onFxInput); document.addEventListener("change",onFxInput);
+function onFxInput(e){ const t=e.target; if(!t.dataset||!t.dataset.fx) return; const id=t.dataset.fx, k=t.dataset.in, spec=FX[id].inp.find(i=>i.id===k);
+  let v; if(spec.type==="check") v=t.checked; else if(spec.type==="num"||spec.type==="range") v=t.value===""?0:+t.value; else v=t.value;
+  fxState(id)[k]=v; const rv=document.querySelector(`[data-rv="${id}-${k}"]`); if(rv) rv.textContent=v; fxRun(id); }
+
+/* ---------- inspector ---------- */
+function hl(code){ return String(code).split("\n").map(line=>{ const ci=line.indexOf("//"); const body=ci>=0?line.slice(0,ci):line, cm=ci>=0?line.slice(ci):"";
+  return esc(body).replace(/\b(if|else|elif|for|return|while|switch|case|try|catch|except|finally|throw|await|async|new)\b/g,'<span class="kw">$1</span>')+(cm?`<span class="cm">${esc(cm)}</span>`:""); }).join("\n"); }
+function dataItem(did,mode,self){
+  const x=D[did]||{n:did,d:""};
+  const prod=(producers[did]||[]).filter(i=>i!==self), cons=(consumers[did]||[]).filter(i=>i!==self);
+  const lk=ids=>ids.length?ids.map(i=>`<button class="lk" data-go="${i}">${esc(byId[i].t)}</button>`).join(", "):"<span class='dd'>none found</span>";
+  return `<details class="item"><summary><span class="dn">${esc(x.n)}</span><span class="dd">${esc(x.d)}</span></summary><div class="links">
+    ${mode!=="out"?`<div><b>Produced by:</b> ${lk(prod)}</div>`:""}
+    <div><b>${mode==="out"?"Used by":"Also used by"}:</b> ${lk(cons)}</div>
+    ${x.s?`<pre>${esc(x.s)}</pre>`:""}</div></details>`;
+}
+function callCard(e){ const row=(k,v)=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:"";
+  return `<div class="callcard"><div class="callh"><span class="calltag">${esc(e.sys||"External")}</span>${e.conf?`<span class="conf">${esc(e.conf)}</span>`:""}</div>
+  <dl>${row("Cluster / host",e.cluster)}${row("Target",e.target)}${row("API",e.api)}${row("When",e.when)}${row("Timeout / retry",e.timeout)}${row("Cache",e.cache)}</dl>
+  ${e.req?`<h4>Request</h4><pre>${esc(e.req)}</pre>`:""}${e.resp?`<h4>Response used</h4><p>${esc(e.resp)}</p>`:""}${e.notes?`<p class="dd">${esc(e.notes)}</p>`:""}</div>`; }
+function casesHtml(n,cur){
+  return `<div class="io">${n.br.map((b,i)=>{ const x=(n.brx||[])[i]; return `<button class="casebtn${cur===i?" cur":""}" data-go="${n.id}__c${i}"><span class="c">${esc(b[0])}</span><span class="a">→</span><span class="r">${esc(b[1])}</span>${x?`<span class="x">${esc(x)}</span>`:""}</button>`; }).join("")}</div>`;
+}
+function inspector(){
+  const n=byId[st.sel]; if(!n) return "";
+  if(n.k==="case"){ const p=byId[n.caseOf];
+    return `<div class="crumbs">${ancestors(n.id).map(a=>`<button data-go="${a}">${esc(byId[a].t)}</button> ›`).join(" ")}</div>
+     <div class="bar"><span class="kindtag">Case ${n.ci+1} of ${p.br.length}</span>${p.c?`<span class="conf">${esc(p.c)}</span>`:""}</div>
+     <h2>If ${esc(n.t)}</h2><p class="desc"><b>Then:</b> ${esc(n.s)}</p>${n.x?`<p class="desc">${esc(n.x)}</p>`:""}
+     <div class="sec"><h3>All cases of “${esc(p.t)}”</h3>${casesHtml(p,n.ci)}</div>
+     ${p.logic?`<div class="sec"><h3>Decision code</h3><pre>${hl(p.logic)}</pre></div>`:""}
+     ${p.ev?`<div class="sec"><h3>Evidence</h3><div class="ev">${esc(p.ev)}</div></div>`:""}`; }
+  const kind={system:"System",service:"Service",stage:"Stage",step:"Step",decision:"Decision",store:"Data store",external:"External call"}[n.k];
+  let h=`<div class="crumbs">${ancestors(n.id).map(a=>`<button data-go="${a}">${esc(byId[a].t)}</button> ›`).join(" ")}</div>
+   <div class="bar"><span class="kindtag">${kind}</span>${n.c?`<span class="conf">${esc(n.c)}</span>`:""}</div>
+   <h2>${esc(n.t)}</h2>${n.s?`<p class="desc" style="color:var(--muted)">${esc(n.s)}</p>`:""}
+   ${n.d&&!(n.what&&(!n.kids||n.cases))?`<p class="desc">${esc(n.d)}</p>`:""}`;
+  if(n.warn) h+=`<div class="note"><b>Known issue.</b> ${esc(n.warn)}</div>`;
+  if(n.what) h+=`<div class="sec"><h3>What happens</h3><ol class="steps">${n.what.map(w=>`<li>${esc(w)}</li>`).join("")}</ol></div>`;
+  if(n.br) h+=`<div class="sec"><h3>Cases (select one for detail)</h3>${casesHtml(n,-1)}</div>`;
+  if(n.logic) h+=`<div class="sec"><h3>Logic (if / else)</h3><pre>${hl(n.logic)}</pre></div>`;
+  if(n.ext&&n.ext.length){ const sy=[...new Set(n.ext.map(e=>e.sys||"External"))];
+    h+=`<div class="sec"><h3>${n.ext.length>1?"External calls":esc(sy[0])+" call"}</h3>${n.ext.map(callCard).join("")}</div>`; }
+  if(n.fx&&n.fx.length) h+=`<div class="sec"><h3>Formula${n.fx.length>1?"s":""} (interactive)</h3>${n.fx.map(fxCard).join("")}</div>`;
+  if(n.calls) h+=`<div class="sec"><h3>Calls (service to service)</h3><div class="calls">${n.calls.map(c=>`<div class="call"><span class="to">→ ${esc(c[0])}</span><span>${esc(c[1])}</span></div>`).join("")}</div></div>`;
+  if(n.in&&n.in.length) h+=`<div class="sec"><h3>Consumes</h3><div class="io">${n.in.map(d=>dataItem(d,"in",n.id)).join("")}</div></div>`;
+  if(n.out&&n.out.length) h+=`<div class="sec"><h3>Produces</h3><div class="io">${n.out.map(d=>dataItem(d,"out",n.id)).join("")}</div></div>`;
+  if(n.uses) h+=`<div class="sec"><h3>How the output is used</h3><p class="desc">${esc(n.uses)}</p></div>`;
+  if(n.kids&&n.kids.length&&!n.cases){
+    const agg={}; descendants(n).forEach(id=>(byId[id].out||[]).forEach(o=>agg[o]=1)); const outs=Object.keys(agg);
+    h+=`<div class="sec"><h3>Inside (${n.kids.length})</h3><div class="calls">${n.kids.map(k=>`<div class="call"><i class="mk ${k.k}" style="margin-top:4px"></i><span><button class="lk" data-go="${k.id}">${esc(k.t)}</button>${k.s?` <span class="dd">${esc(k.s)}</span>`:""}</span></div>`).join("")}</div></div>`;
+    if(outs.length) h+=`<div class="sec"><h3>Everything produced in this branch (${outs.length})</h3><div class="io">${outs.map(d=>dataItem(d,"out",null)).join("")}</div></div>`;
+  }
+  if(n.ev) h+=`<div class="sec"><h3>Evidence</h3><div class="ev">${esc(n.ev)}</div></div>`;
+  return h;
+}
+function lineage(){
+  const q=st.q.trim().toLowerCase();
+  const rows=Object.keys(D).filter(k=>!q||(D[k].n+" "+D[k].d+" "+k).toLowerCase().includes(q));
+  const lk=ids=>(ids||[]).map(i=>`<button class="lk" data-go="${i}">${esc(byId[i].t)}</button>`).join(", ")||"<span class='dd'>none found</span>";
+  return `<div class="lineage"><div class="lrow"><span class="h">Data</span><span class="h">Produced by</span><span class="h">Used by</span></div>`+
+   rows.map(k=>`<div class="lrow"><span><span class="dn">${esc(D[k].n)}</span><br><span class="dd">${esc(D[k].d)}</span></span><span>${lk(producers[k])}</span><span>${lk(consumers[k])}</span></div>`).join("")+`</div>`;
+}
+function formulas(){
+  const q=st.q.trim().toLowerCase();
+  const ids=Object.keys(FX).filter(id=>!q||(FX[id].t+" "+FX[id].d).toLowerCase().includes(q));
+  return `<div class="fxgrid">${ids.map(fxCard).join("")}</div>`;
+}
+
+/* ---------- map rendering ---------- */
+let stageEl, worldEl, svgEl, nodeEls={};
+function buildShell(){
+  const m=document.getElementById("main");
+  m.innerHTML=`<div class="layout"><div class="mapstage" id="stage" aria-label="Service map, drag to pan">
+     <div class="world" id="world"><svg class="wires" id="wires"></svg></div>
+     <div class="hint">Drag to pan · double-click to zoom in (Shift to zoom out) · or use − and +</div>
+     <div class="zoombar" role="group" aria-label="Zoom"><button class="btn" id="zOut" aria-label="Zoom out">−</button><button class="btn zl" id="zReset" title="Reset zoom to 100%" aria-label="Zoom level; click to reset to 100%">100%</button><button class="btn" id="zIn" aria-label="Zoom in">+</button><button class="btn" id="zFit" title="Fit the whole map in view">Fit</button></div>
+   </div><aside class="insp" id="insp" aria-live="polite"></aside></div>`;
+  stageEl=document.getElementById("stage"); worldEl=document.getElementById("world"); svgEl=document.getElementById("wires"); nodeEls={};
+  document.getElementById("zIn").onclick=()=>zoomAt(1.25);
+  document.getElementById("zOut").onclick=()=>zoomAt(1/1.25);
+  document.getElementById("zReset").onclick=()=>zoomAt(1/st.k);
+  document.getElementById("zFit").onclick=fit;
+  bindPan();
+}
+function nodeHTML(n){
+  const has=n.kids&&n.kids.length, open=st.open.has(n.id);
+  let pills="";
+  if(n.k!=="case"){
+    if(n.logic) pills+=`<span class="pill if">if</span>`;
+    [...new Set((n.ext||[]).map(e=>e.tag||"IO"))].forEach(t=>pills+=`<span class="pill call">${esc(t)}</span>`);
+    if(n.fx&&n.fx.length) pills+=`<span class="pill fx">ƒ</span>`;
+    if(n.warn) pills+=`<span class="pill w">!</span>`;
+    if(n.k!=="decision"&&n.out&&n.out.length) pills+=`<span class="pill">${n.out.length} out</span>`;
+    if(n.k!=="decision"&&n.in&&n.in.length) pills+=`<span class="pill">${n.in.length} in</span>`;
+  }
+  const lbl=open?"−":(n.kids&&n.kids.length);
+  return (n.k==="decision"?`<svg class="dshape" viewBox="0 0 240 96" preserveAspectRatio="none" aria-hidden="true"><polygon points="120,1.5 238.5,48 120,94.5 1.5,48"/></svg>`:`<span class="stripe"></span>`)+`<button class="body" data-sel="${n.id}" title="${esc(n.k==="case"?"If "+n.t+" → "+n.s:n.t+(n.s?" · "+n.s:""))}"><span class="t">${esc(n.t)}</span>${n.s?`<span class="s">${n.k==="case"?"→ ":""}${esc(n.s)}</span>`:""}${pills?`<span class="meta">${pills}</span>`:""}</button>`+
+    (has?`<button class="tg${open?" open":""}${n.cases?" cases":""}" data-tog="${n.id}" aria-expanded="${open}" aria-label="${open?"Collapse":"Expand"} ${esc(n.t)}${n.cases?" cases":""}">${lbl}</button>`:"");
+}
+function drawMap(){
+  const totalH=layout();
+  const vis=new Set(Object.keys(POS));
+  Object.keys(nodeEls).forEach(id=>{ if(!vis.has(id)){ nodeEls[id].remove(); delete nodeEls[id]; } });
+  const q=st.q.trim().toLowerCase();
+  const fe=flowEdges(); const fin=new Set(fe.filter(e=>e.dir==="in").map(e=>e.from)), fout=new Set(fe.filter(e=>e.dir==="out").map(e=>e.to));
+  vis.forEach(id=>{
+    const n=byId[id]; let el=nodeEls[id];
+    if(!el){ el=document.createElement("div"); el.dataset.id=id; worldEl.appendChild(el); nodeEls[id]=el;
+      const pid=parentOf[id]; const pp=pid&&POS[pid]; if(pp){ el.style.left=pp.x+"px"; el.style.top=pp.y+"px"; } }
+    el.className=`nd k-${n.k}${st.sel===id?" sel":""}${fin.has(id)?" fin":""}${fout.has(id)?" fout":""}${q&&nodeText(n).includes(q)?" hit":""}`;
+    el.innerHTML=nodeHTML(n);
+    requestAnimationFrame(()=>{ el.style.left=POS[id].x+"px"; el.style.top=POS[id].y+"px"; });
+  });
+  let w="";
+  vis.forEach(id=>{ const p=parentOf[id]; if(!p||!POS[p]) return; const a=POS[p], b=POS[id];
+    const x1=a.x+W+13, y1=a.y+a.h/2, x2=b.x, y2=b.y+b.h/2, m=(x1+x2)/2;
+    w+=`<path class="wire${byId[id].k==="case"?" cw":""}" d="M${x1},${y1} C${m},${y1} ${m},${y2} ${x2},${y2}"/>`; });
+  fe.forEach(e=>{ const a=POS[e.from], b=POS[e.to]; if(!a||!b) return; const c=curve(a,b);
+    const label=e.ds.length>2?e.ds.slice(0,2).join(", ")+` +${e.ds.length-2}`:e.ds.join(", ");
+    w+=`<path class="flow ${e.dir}" d="${c.p}"><title>${esc(e.ds.join(", "))}</title></path><text class="flowlbl ${e.dir}" x="${c.mx}" y="${c.my-4}" text-anchor="middle">${esc(label)}</text>`; });
+  const maxX=Math.max(...Object.values(POS).map(p=>p.x))+W+200;
+  svgEl.setAttribute("width",maxX); svgEl.setAttribute("height",totalH+200);
+  svgEl.innerHTML=w;
+  const insp=document.getElementById("insp"); const keepScroll=insp.dataset.cur===st.sel?insp.scrollTop:0;
+  insp.innerHTML=inspector(); insp.dataset.cur=st.sel; insp.scrollTop=keepScroll;   // not data-sel: that attribute means "click selects"
+  runVisibleFx();
+  applyTx();
+}
+function applyTx(){ worldEl.style.transform=`translate(${st.tx}px,${st.ty}px) scale(${st.k})`;
+  const z=document.getElementById("zReset"), zi=document.getElementById("zIn"), zo=document.getElementById("zOut");
+  if(z) z.textContent=Math.round(st.k*100)+"%"; if(zi) zi.disabled=st.k>=2.2-1e-9; if(zo) zo.disabled=st.k<=0.2+1e-9; }
+function zoomAt(f,cx,cy){ const r=stageEl.getBoundingClientRect(); cx=cx??r.width/2; cy=cy??r.height/2;
+  const k2=Math.min(2.2,Math.max(0.2,st.k*f)); st.tx=cx-(cx-st.tx)*(k2/st.k); st.ty=cy-(cy-st.ty)*(k2/st.k); st.k=k2; applyTx(); }
+// Double-click zoom: scales by f and glides the clicked point to the centre of the map.
+function animateZoomTo(f,cx,cy){
+  const r=stageEl.getBoundingClientRect(), k0=st.k, k1=Math.min(2.2,Math.max(0.2,k0*f));
+  const wx=(cx-st.tx)/k0, wy=(cy-st.ty)/k0;                 // world point under the cursor
+  const ex=r.width/2, ey=r.height/2;                         // where it should end up
+  const set=(k,sx,sy)=>{ st.k=k; st.tx=sx-wx*k; st.ty=sy-wy*k; applyTx(); };
+  const reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce){ set(k1,ex,ey); return; }
+  const t0=performance.now(), DUR=260;
+  (function step(now){ const p=Math.min(1,(now-t0)/DUR), e=1-Math.pow(1-p,3);
+    set(k0*Math.pow(k1/k0,e), cx+(ex-cx)*e, cy+(ey-cy)*e);
+    if(p<1) requestAnimationFrame(step); })(t0);
+}
+function fit(){ const xs=Object.values(POS); if(!xs.length) return; const r=stageEl.getBoundingClientRect();
+  const w=Math.max(...xs.map(p=>p.x))+W+40, h=Math.max(...xs.map(p=>p.y+p.h))+40;
+  st.k=Math.min(1.2,Math.max(0.2,Math.min(r.width/w,r.height/h))); st.tx=(r.width-w*st.k)/2+20*st.k; st.ty=(r.height-h*st.k)/2+20*st.k; applyTx(); }
+function centerOn(id){ const p=POS[id]; if(!p) return; const r=stageEl.getBoundingClientRect();
+  const sx=st.tx+p.x*st.k, sy=st.ty+p.y*st.k;
+  if(sx<20||sx+W*st.k>r.width-20||sy<20||sy+p.h*st.k>r.height-20){ st.tx=r.width*0.35-p.x*st.k; st.ty=r.height/2-(p.y+p.h/2)*st.k; applyTx(); } }
+function keepAnchor(id,fn){ const before=POS[id]; fn(); const after=POS[id]; if(before&&after){ st.tx+=(before.x-after.x)*st.k; st.ty+=(before.y-after.y)*st.k; applyTx(); } }
+
+function bindPan(){
+  let drag=null;
+  stageEl.addEventListener("pointerdown",e=>{ if(e.target.closest("button,.zoombar")) return; drag={x:e.clientX,y:e.clientY,tx:st.tx,ty:st.ty}; stageEl.setPointerCapture(e.pointerId); stageEl.classList.add("drag"); });
+  stageEl.addEventListener("pointermove",e=>{ if(!drag) return; st.tx=drag.tx+e.clientX-drag.x; st.ty=drag.ty+e.clientY-drag.y; applyTx(); });
+  const end=()=>{ drag=null; stageEl.classList.remove("drag"); };
+  stageEl.addEventListener("pointerup",end); stageEl.addEventListener("pointercancel",end);
+  // no wheel handler: the mouse wheel scrolls the page; zoom only through the buttons and double-click.
+  // Double-click is detected here (capture phase on the map container) rather than with the native
+  // dblclick event, because a single click re-renders the node under the pointer.
+  let tapDown=null, lastTap=null;
+  stageEl.addEventListener("pointerdown",e=>{ tapDown={x:e.clientX,y:e.clientY,skip:!!e.target.closest(".tg,.zoombar")||e.button!==0}; },true);
+  stageEl.addEventListener("pointerup",e=>{
+    const d=tapDown; tapDown=null; if(!d) return;
+    if(d.skip||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6){ lastTap=null; return; }      // toggle, zoom bar or a drag
+    const now=e.timeStamp;                     // input time, unaffected by re-render work
+    if(lastTap&&now-lastTap.t<350&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<12){
+      lastTap=null; const r=stageEl.getBoundingClientRect();
+      animateZoomTo(e.shiftKey?0.5:2, e.clientX-r.left, e.clientY-r.top);
+    } else lastTap={t:now,x:e.clientX,y:e.clientY};
+  },true);
+}
+
+function render(){
+  document.getElementById("vTree").setAttribute("aria-pressed",st.view==="map");
+  document.getElementById("vLin").setAttribute("aria-pressed",st.view==="lin");
+  document.getElementById("vFx").setAttribute("aria-pressed",st.view==="fx");
+  document.getElementById("flowBtn").setAttribute("aria-pressed",st.flow);
+  if(st.view==="lin"){ stageEl=null; document.getElementById("main").innerHTML=lineage(); return; }
+  if(st.view==="fx"){ stageEl=null; document.getElementById("main").innerHTML=formulas(); runVisibleFx(); return; }
+  if(!stageEl||!document.body.contains(stageEl)) buildShell();
+  drawMap();
+}
+function toggle(id){
+  keepAnchor(id,()=>{
+    if(id===ROOT&&st.open.has(ROOT)&&st.open.size>1){ st.open=new Set(); }
+    else if(id===ROOT&&st.open.size<=1){ Object.keys(byId).forEach(i=>{ if(byId[i].k!=="case"&&!byId[i].cases) st.open.add(i); }); }
+    else st.open.has(id)?st.open.delete(id):st.open.add(id);
+    layout();
+  });
+  render();
+  const b=document.querySelector(`[data-tog="${id}"]`); b&&b.focus({preventScroll:true});
+}
+function select(id,center){ st.sel=id; ancestors(id).forEach(a=>st.open.add(a)); try{localStorage.setItem(SKEY,id)}catch(e){} st.view="map"; render(); if(center) centerOn(id); }
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tog],[data-sel],[data-go]"); if(!t) return;
+  if(t.dataset.tog){ toggle(t.dataset.tog); return; }
+  if(t.dataset.sel){ select(t.dataset.sel,false); return; }
+  if(t.dataset.go){ select(t.dataset.go,true); }
+});
+document.getElementById("expAll").onclick=()=>{ Object.keys(byId).forEach(i=>{ if(!byId[i].cases) st.open.add(i); }); st.view="map"; render(); fit(); };
+document.getElementById("colAll").onclick=()=>{ st.open=new Set([ROOT]); st.view="map"; render(); fit(); };
+document.getElementById("vTree").onclick=()=>{st.view="map";render();};
+document.getElementById("vLin").onclick=()=>{st.view="lin";render();};
+document.getElementById("vFx").onclick=()=>{st.view="fx";render();};
+document.getElementById("flowBtn").onclick=()=>{st.flow=!st.flow;render();};
+document.getElementById("q").addEventListener("input",e=>{ st.q=e.target.value; const q=st.q.trim().toLowerCase();
+  if(q && st.view==="map"){ Object.values(byId).forEach(n=>{ if(nodeText(n).includes(q)) ancestors(n.id).forEach(a=>st.open.add(a)); }); }
+  render(); });
+function legendHTML(){
+  const all=Object.values(byId), kinds=new Set(all.map(n=>n.k));
+  const K=[["system","System"],["service","Service"],["stage","Stage"],["step","Step"],["decision","Decision"],["case","Case"],["store","Data store"],["external","External"]];
+  const tags=[...new Set(all.flatMap(n=>(n.ext||[]).map(e=>e.tag||"IO")))];
+  let h=K.filter(k=>kinds.has(k[0])).map(k=>`<span><i class="mk ${k[0]}"></i>${k[1]}</span>`).join("");
+  if(all.some(n=>n.logic)) h+=`<span><span class="pill if">if</span>has if/else</span>`;
+  if(tags.length) h+=`<span>${tags.map(t=>`<span class="pill call">${esc(t)}</span>`).join(" ")} external call</span>`;
+  if(Object.keys(FX).length) h+=`<span><span class="pill fx">ƒ</span>formula</span>`;
+  if(all.some(n=>n.warn)) h+=`<span><span class="pill w">!</span>known issue</span>`;
+  return h+`<span><i class="ln in"></i>feeds the selected node</span><span><i class="ln out"></i>uses its output</span>`;
+}
+document.getElementById("kicker").textContent=CFG.kicker||"";
+document.getElementById("ttl").textContent=CFG.title||"Service Map";
+document.getElementById("lede").innerHTML=CFG.lede||"The system is on the left; services, stages and steps open to the right. Decisions (diamonds) open into their cases (dashed nodes). Select any node to see what happens there, the if/else as written in code, the external calls it makes and live calculators for the formulas involved. Purple and orange lines show where the selected node's data comes from and goes to.";
+document.getElementById("foot").innerHTML=CFG.foot||"Each node and calculator carries a confidence tag: <b>Code</b> = read in source; <b>Docs</b> = vendor-documented behavior; <b>Doc</b> = team notes; <b>Inferred</b> or <b>Model</b> = derived, verify before quoting. Logic blocks are the code simplified with names kept, not a literal copy.";
+document.getElementById("q").placeholder=CFG.find||"Find a node, data item or formula…";
+document.getElementById("legend").innerHTML=legendHTML();
+if(!Object.keys(FX).length) document.getElementById("vFx").hidden=true;
+if(!Object.keys(D).length) document.getElementById("vLin").hidden=true;
+ancestors(st.sel).forEach(a=>st.open.add(a));
+render(); fit();
+</script>
+</body>
+</html>
