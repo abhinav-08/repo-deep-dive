@@ -29,6 +29,12 @@ const fs = require('fs'), path = require('path');
       const lim = n.k === 'decision' ? 34 : n.k === 'case' ? 30 : 28;
       if (String(n.t).length > lim) longT.push(n.id + ' (' + String(n.t).length + ')');
     });
+    // Evidence must be repo-relative with line numbers ("<repo>/<path>:<line|a-b>") or svcmap_diff.js
+    // cannot map a git diff back onto this node. A warn, not a failure: the page renders either way.
+    const evBad = [], evOk = r => r.includes('/') && /:\d+(-\d+)?$/.test(r);
+    const evRefs = o => String(o.ev).split(',').map(x => x.trim()).filter(Boolean);
+    Object.values(byId).forEach(n => { if (n.ev) evRefs(n).forEach(r => { if (!evOk(r)) evBad.push(n.id + ' "' + r + '"'); }); });
+    Object.entries(FX).forEach(([id, f]) => { if (f && f.ev) evRefs(f).forEach(r => { if (!evOk(r)) evBad.push(id + ' "' + r + '"'); }); });
     const unlinked = Object.keys(D).filter(d => !(consumers[d] || []).length && !(producers[d] || []).length);
     const extraOrphans = Object.keys(EXTRA).filter(id => !byId[id]);
     const fxErr = [];
@@ -44,7 +50,8 @@ const fs = require('fs'), path = require('path');
     return { nodes: ids.length, decisions: Object.values(byId).filter(n => n.k === 'decision').length,
       dataItems: Object.keys(D).length, formulas: Object.keys(FX).length,
       dup, badKind, missingD, extraOrphans, missingFx, brxLenMismatch: brx, fxErr,
-      warn_inputsWithoutProducer: orphanIn, warn_unlinkedData: unlinked, warn_longTitles: longT };
+      warn_inputsWithoutProducer: orphanIn, warn_unlinkedData: unlinked, warn_longTitles: longT,
+      warn_evNotRepoRelative: evBad };
   }));
 
   // 2. worst-case layout: everything open, including every decision's cases

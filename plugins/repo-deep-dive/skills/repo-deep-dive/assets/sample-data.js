@@ -1,4 +1,5 @@
-/* Sample data block: a tiny fictional orders platform that exercises every field. Replace all of it per repo. */
+/* Sample data block: a tiny fictional orders platform that exercises every field. Replace all of it per repo.
+   `ev` paths are repo-relative ("<repo>/<path>:<line|a-b>"): svcmap_diff.js maps a git diff onto node ids through them. */
 const CFG={
   title:"Orders Service Map",                     // h1 (the <title> comes from build_svcmap.py --title)
   kicker:"Example · checkout-api and fulfilment",  // small caps line above the title
@@ -22,14 +23,14 @@ const N={id:"root",k:"system",t:"Orders Platform",s:"example data for the templa
  {id:"api",k:"service",t:"checkout-api",s:"Spring Boot · 6 pods",
   calls:[["PostgreSQL","cart reads, 200 ms statement timeout"],["payments-gw","authorize, 2 s per try, 3 tries"],["Kafka","publish orders.v1"]],kids:[
   {id:"api_val",k:"stage",t:"Validate",kids:[
-   {id:"api_load",k:"step",t:"Load cart",s:"CartRepository.findById",in:["req"],out:["cart"],ev:"CartRepository.java:41",c:"Code"},
+   {id:"api_load",k:"step",t:"Load cart",s:"CartRepository.findById",in:["req"],out:["cart"],ev:"checkout-api/src/main/java/com/shop/cart/CartRepository.java:41",c:"Code"},
    {id:"api_cartok",k:"decision",t:"Cart usable?",in:["cart"],
-    br:[["cart == null","404 CART_NOT_FOUND"],["cart.items empty","400 EMPTY_CART"],["otherwise","continue to pricing"]],ev:"CheckoutService.java:58-71",c:"Code"}]},
+    br:[["cart == null","404 CART_NOT_FOUND"],["cart.items empty","400 EMPTY_CART"],["otherwise","continue to pricing"]],ev:"checkout-api/src/main/java/com/shop/checkout/CheckoutService.java:58-71",c:"Code"}]},
   {id:"api_price",k:"stage",t:"Price and pay",kids:[
-   {id:"api_total",k:"step",t:"Compute total",in:["cart"],out:["total"],ev:"PricingService.java:22-40",c:"Code"},
+   {id:"api_total",k:"step",t:"Compute total",in:["cart"],out:["total"],ev:"checkout-api/src/main/java/com/shop/pricing/PricingService.java:22-40",c:"Code"},
    {id:"api_pay",k:"external",t:"Authorize payment",s:"payments-gw POST /authorize",in:["total"],out:["pay"],
-    warn:"Retries a non-idempotent call without an idempotency key.",ev:"PaymentClient.java:30-77",c:"Code"},
-   {id:"api_pub",k:"step",t:"Publish OrderPlaced",in:["pay","total"],out:["evt"],ev:"OrderEvents.java:19",c:"Code"}]},
+    warn:"Retries a non-idempotent call without an idempotency key.",ev:"checkout-api/src/main/java/com/shop/pay/PaymentClient.java:30-77",c:"Code"},
+   {id:"api_pub",k:"step",t:"Publish OrderPlaced",in:["pay","total"],out:["evt"],ev:"checkout-api/src/main/java/com/shop/events/OrderEvents.java:19",c:"Code"}]},
   {id:"pg",k:"store",t:"orders-db (Postgres)",s:"carts, cart_items, orders",out:["cart"],c:"Code"}]},
  {id:"ful",k:"service",t:"fulfilment",s:"Kafka consumer group fulfilment-v2",kids:[
   {id:"ful_consume",k:"step",t:"Consume OrderPlaced",in:["evt"],uses:"Creates one pick list per warehouse.",c:"Doc"}]}
@@ -52,14 +53,14 @@ else if (cart.items.isEmpty()) throw BadRequest("EMPTY_CART")      // 400
   ext:{sys:"Kafka",tag:"KAFKA",target:"topic orders.v1",api:"KafkaTemplate.send",when:"payment authorized",notes:"acks=all from the producer config.",conf:"Code"}}
 };
 const FX={
- total:{t:"Order total",conf:"Code",d:"Subtotal minus coupon (capped), then tax on the discounted amount.",
+ total:{t:"Order total",conf:"Code",ev:"checkout-api/src/main/java/com/shop/pricing/PricingService.java:22-40",d:"Subtotal minus coupon (capped), then tax on the discounted amount.",
   inp:[{id:"sub",type:"num",label:"Subtotal",v:120},{id:"cp",type:"select",label:"Coupon",v:"10",opts:[["0","none"],["10","SAVE10 (10%)"],["25","SAVE25 (25%)"]]},
        {id:"tax",type:"range",label:"Tax rate %",min:0,max:20,step:0.5,v:5},{id:"cap",type:"check",label:"Cap discount at 20",v:true}],
   run(v){ let disc=v.sub*(+v.cp)/100; if(v.cap) disc=Math.min(disc,20); const net=v.sub-disc, tax=net*v.tax/100;
    return {rows:[["Discount",fmt(disc)],["Taxable amount",fmt(net)],["Tax",fmt(tax)],["Total",fmt(net+tax),"ok"]],
     svg:plot({f:x=>(x-(v.cap?Math.min(x*(+v.cp)/100,20):x*(+v.cp)/100))*(1+v.tax/100),lo:0,hi:Math.max(200,v.sub*1.5),x:v.sub,xl:"subtotal",aria:"Total against subtotal"}),
     note:"The cap applies before tax."}; }},
- retry:{t:"Payment retry timeline",conf:"Code",d:"3 tries, 2 s timeout each, 200 ms × 2^n wait between tries.",
+ retry:{t:"Payment retry timeline",conf:"Code",ev:"checkout-api/src/main/resources/application-prod.yml:12-18",d:"3 tries, 2 s timeout each, 200 ms × 2^n wait between tries.",
   inp:[{id:"lat",type:"range",label:"Gateway latency (ms)",min:100,max:3000,step:50,v:2500}],
   run(v){ const segs=[]; let t=0, ok=false;
    for(let i=0;i<3&&!ok;i++){ const d=Math.min(v.lat,2000); ok=v.lat<=2000;

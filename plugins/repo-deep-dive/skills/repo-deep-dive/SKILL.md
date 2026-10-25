@@ -1,6 +1,6 @@
 ---
 name: repo-deep-dive
-description: Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack.
+description: Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack. Re-run it after code changes and it refreshes only what moved.
 ---
 
 # Repo deep dive
@@ -15,24 +15,67 @@ Aim for production depth: 150 to 250 nodes, every branch point as a decision, a 
 The UI is already built and tested, and lives in this skill's folder. For each repo you only write data.
 - `assets/svcmap-template.html`: the page. Never edit it per repo.
 - `assets/sample-data.js`: a small fictional example that uses every field.
-- `scripts/build_svcmap.py`: merges the template and your data into the page and an offline copy.
+- `scripts/build_svcmap.py`: merges the template and your data into the page and an offline copy, and records what the build saw.
 - `scripts/check_svcmap.js`: loads the page in headless Chromium, checks it and takes screenshots.
+- `scripts/svcmap_diff.js`: works out what a built map needs re-read after the repos moved on.
 
 "This skill's folder" is `${CLAUDE_SKILL_DIR}` in Claude Code. Elsewhere it is the directory this SKILL.md was loaded from.
 
-## Step 0: Scope (first reply)
+## Step 0: Mode — full build or refresh
+
+A map that already exists is not rebuilt from scratch. Before reading any code, look for `state.json` in the work folder (`service-maps/<slug>/`, or wherever the user keeps the map).
+
+- **No work folder or no `state.json`:** full build. Go to Step 1.
+- **The user said `full`, or asked to start over:** full build. Keep the old `facts.md` and data files until the new ones pass the checker.
+- **Otherwise:** refresh. Don't guess the scope — the diff computes it:
+
+```bash
+cd service-maps/<slug>
+node svcmap_diff.js --state state.json --out out/work-order.json cfg.js data.js nodes-*.js extra.js fx.js
+```
+
+Act on the exit code, not just the output:
+
+- **2, current.** No repo moved. Say so, point at the existing map, and stop. Don't rebuild.
+- **1, full rebuild needed.** The repo path is gone, the recorded commit isn't in the repo (force-push or shallow clone), or there's no state to diff against. Say which, then go to Step 1.
+- **0, refresh.** The work order names exactly what to do. Work the lists in this order:
+
+| List | What it means | What to do |
+|---|---|---|
+| `reread` | An edit lands inside the node's cited line range. | Re-read those lines. Update the node, its `ext`, `logic`, `what` and `fx`, and its `ev` range. |
+| `formulas` | A source or config file an `FX` entry models changed. | Re-check every input default against the new config, and the `run` body if the math itself moved. |
+| `renamed` | The cited file moved. `similarity: 100` means the contents are identical. | At 100, rewrite the `ev` path and nothing else. Below 100, treat it as `reread` as well. |
+| `orphaned` | The cited file was deleted. | Find where the behavior went. Moved: re-anchor `ev`. Gone: delete the node and any `D` entries only it used. Either way it's a finding. |
+| `drift` | Only lines *above* the node changed. | Apply the `suggest` range to `ev`. Don't re-read: nothing inside the node changed. |
+| `scan` | A changed or new file that no node cites. | Read it. A new entry point, external call or branch means new nodes. A deleted one means the first read cited nothing there, which is itself worth recording. |
+
+Rules for a refresh:
+
+1. **Only touch what the work order names.** A node in none of the lists keeps its text, its `ev` and its confidence tag. Not re-reading it is the point.
+2. **`drift` is not a re-read.** Shift the line numbers and move on.
+3. **Re-verify `Inferred` nodes next to a `reread`.** An inference drawn from code that just changed is the first thing to go stale.
+4. **Append to `facts.md`; don't rewrite it.** Mark superseded lines instead of deleting them, so the history survives.
+5. **`template_changed` in the work order** means rebuild the page from the current template. The data still stands.
+6. **If the work order touches more than about half the nodes, say so and offer a full build.** Past that the refresh has stopped being cheaper, and a fresh read is more likely to be coherent.
+
+A refresh still ends with Step 4 (build and check) and Step 5 (deliver). Steps 2 and 3 apply only to the files the work order named.
+
+## Step 1: Scope
 
 - **Find the repos.** Read them from the workspace. For a GitHub URL, clone it (shallow) if the environment allows; otherwise ask the user for the code.
 - **Scope tightly.** Start from the repos the user named and follow only the calls they make into other repos. Don't scan every repo in the workspace. Read the workspace and per-repo CLAUDE.md and README files first when they exist.
 - **Deliverables.** Build the map by default. Add the Q&A pack when the user asks for it, whether for onboarding, a design review, a handover or interview prep. The pack needs a list of focus areas (a topic list, a job description, a review agenda); if it isn't in the conversation, ask for it once.
 - If several repos are named and the entry point is unclear, ask one question. Otherwise start working in the same reply.
-- Make a task list: read code, fact register, map data, build and check, deliver, Q&A pack (if wanted), verify.
+- Make a task list. Full build: read code, fact register, map data, build and check, deliver, Q&A pack (if wanted), verify. Refresh: run the diff, work the lists, update facts, rebuild and check, write `CHANGES.md`, deliver.
+- **Record the repos for later refreshes.** Note each repo's name and its path relative to the work folder; Step 4 passes them to the build as `--repo <name>=<path>`.
 
-## Step 1: Read the code into a fact register
+## Step 2: Read the code into a fact register
 
 Keep `facts.md` in the work folder, one tagged and sourced line per fact:
 `[Code] OrderService.java:88-104 placeOrder: retries the payment call only on HTTP 503`
 Every map node and every pack claim comes from this file. If the session is interrupted, you can carry on from it.
+
+**On a refresh, read only the files the work order named** — its `reread`, `formulas`, `renamed` (below 100) and `scan` entries. The order below is for a first pass.
 
 Read in this order:
 1. Entry points: HTTP routes, consumers, schedulers, CLIs.
@@ -64,7 +107,7 @@ Confidence tags go on nodes (`c`), call cards (`conf`) and calculators (`conf`):
 
 Combine them when a claim is mixed, e.g. "Code + Inferred".
 
-## Step 2: Model the map
+## Step 3: Model the map
 
 **Tree shape**
 - **Root (`k:"system"`):** the platform. Its `d` is a one-paragraph overview.
@@ -78,7 +121,8 @@ Combine them when a claim is mixed, e.g. "Code + Inferred".
   - Case conditions: 30 or fewer.
   - Decision titles: 34 or fewer (they wrap to two lines).
   - Subtitles: 45 or fewer. Longer text goes in `d`, `what` or `brx`.
-- **Ids:** short, stable and prefixed per service (`api_`, `wrk_`). Case ids are `<id>__c<i>`.
+- **Ids:** short, stable and prefixed per service (`api_`, `wrk_`). Case ids are `<id>__c<i>`. Ids are the refresh's handle on a node, so never renumber one that still describes the same code.
+- **Evidence paths (`ev`):** repo-relative, with line numbers — `<repo>/<path>:<line>` or `<repo>/<path>:<from>-<to>`, for example `checkout-api/src/main/java/com/shop/cart/CartRepository.java:41`. Several references may be comma-separated. A refresh maps the git diff onto nodes through these, so a bare filename costs you the incremental path; the checker lists offenders under `warn_evNotRepoRelative`. Put `ev` on `FX` entries too, pointing at the source or config file whose numbers the calculator models.
 
 **Data and lineage**
 - Put every value that crosses a step boundary in `D`: requests, flags, intermediate objects, cache keys, query bodies, responses and events. Give each `s` a realistic shape with real field names.
@@ -116,10 +160,10 @@ The data files must declare `CFG`, `D`, `N`, `EXTRA` and `FX`; use `{}` when one
 |---|---|---|
 | `CFG` | `title`, `kicker`, `find`, `key`, `open[]`, `sel`, `lede?`, `foot?` | `lede` and `foot` accept simple HTML. `key` namespaces the remembered selection. |
 | `D[key]` | `n`, `d`, `s?` | Name, what it is, and a shape or example (shown as code). |
-| node in `N` | `id`, `k`, `t`, `s?`, `d?`, `kids?`, `in?`, `out?`, `calls?`, `br?`, `ev?`, `c?`, `warn?`, `uses?` | `k` is one of system, service, stage, step, decision, store, external. `ev` holds file:line evidence. `uses` says how the output is used. |
+| node in `N` | `id`, `k`, `t`, `s?`, `d?`, `kids?`, `in?`, `out?`, `calls?`, `br?`, `ev?`, `c?`, `warn?`, `uses?` | `k` is one of system, service, stage, step, decision, store, external. `ev` holds repo-relative file:line evidence. `uses` says how the output is used. |
 | `EXTRA[id]` | `what[]`, `logic`, `ext`, `fx[]`, `brx[]`, `warn`, `uses`, `ev`, `c`, `patch{}` | Merged into the node at load. `patch` overrides any base field. |
 | `ext` (object or array) | `sys`, `tag`, `cluster`, `target`, `api`, `when`, `timeout`, `cache`, `req`, `resp`, `notes`, `conf` | `tag` is the pill text (ES, SQL, KAFKA, REDIS, HTTP). |
-| `FX[id]` | `t`, `conf`, `d`, `inp[]`, `run(v)` | Input fields:<br>• `id`, `type`, `label`, `v`<br>• `type` is text, num, range, check or select<br>• `min`, `max`, `step` for ranges<br>• `opts: [[value, label]]` for selects<br><br>`run` returns `{rows: [[label, value, "ok"/"warn"/"bad"/"mono"]], svg?, html?, trace?[], note?}` and may be async. |
+| `FX[id]` | `t`, `conf`, `d`, `ev?`, `inp[]`, `run(v)` | Input fields:<br>• `id`, `type`, `label`, `v`<br>• `type` is text, num, range, check or select<br>• `min`, `max`, `step` for ranges<br>• `opts: [[value, label]]` for selects<br><br>`run` returns `{rows: [[label, value, "ok"/"warn"/"bad"/"mono"]], svg?, html?, trace?[], note?}` and may be async. |
 
 The template provides these helpers. Don't redeclare them at the top level:
 - `L` (String.raw)
@@ -131,18 +175,26 @@ The template provides these helpers. Don't redeclare them at the top level:
 
 You can split large data across files, for example cfg.js, data.js, nodes-<svc>.js, extra.js and fx.js; the build concatenates them in order. To split the tree, declare subtrees as consts and assemble `const N = {id: "root", ..., kids: [EDGE, API, WRK]}` in the last nodes file.
 
-## Step 3: Build, check, look
+## Step 4: Build, check, look
 
-1. **Copy the four files into a work folder.** Use `service-maps/<slug>/` in the workspace unless the user names another place. Run the later commands from the work folder.
+1. **Copy the skill's files into a work folder.** Use `service-maps/<slug>/` in the workspace unless the user names another place. Run the later commands from the work folder. On a refresh the folder already exists; re-copy the files so a skill update takes effect.
 
 ```bash
 SKILL="${CLAUDE_SKILL_DIR}"; WORK=service-maps/<slug>
-mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/sample-data.js "$SKILL"/scripts/build_svcmap.py "$SKILL"/scripts/check_svcmap.js "$WORK"/ && cd "$WORK"
+mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/sample-data.js "$SKILL"/scripts/build_svcmap.py "$SKILL"/scripts/check_svcmap.js "$SKILL"/scripts/svcmap_diff.js "$WORK"/ && cd "$WORK"
 ```
 
 2. **Write the data files.** Start from sample-data.js, which uses every field.
 3. **Build:**
-   `python3 build_svcmap.py svcmap-template.html out/<slug>-service-map.html cfg.js data.js ... --title "<Name> Service Map" --standalone out/download/<slug>-service-map.html`
+
+```bash
+python3 build_svcmap.py svcmap-template.html out/<slug>-service-map.html cfg.js data.js ... \
+  --title "<Name> Service Map" --standalone out/download/<slug>-service-map.html \
+  --state state.json --repo <name>=<path-to-repo> [--repo ...]
+```
+
+   `--state` and `--repo` are what make the next run incremental: the build records each repo's commit, the template's hash and a hash of every file the data cites in `ev`. Pass `--repo` once per repo, with the path relative to the work folder (`--repo checkout-api=../../checkout-api`). Always pass them — a map built without `--state` can only ever be rebuilt in full. The build prints how many `ev` paths it could not find on disk; anything above zero means a wrong path, so fix it now rather than discovering it at the next refresh.
+
    The build refuses data that:
    - is missing CFG, D, N, EXTRA or FX;
    - redeclares a helper at the top level;
@@ -155,17 +207,38 @@ mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/samp
    - Fix every hard failure.
    - Review the warn lists:
      - an input with no producer, other than the entry request, means a missing node or data link;
-     - long titles get cut.
+     - long titles get cut;
+     - `warn_evNotRepoRelative` lists evidence a refresh won't be able to map; fix each one.
 5. **Look at every screenshot** in out/shots: everything open, decision selected, inspector in light and dark, formulas, phone width.
-6. **Re-check five random leaves** against the source before delivering.
+6. **Re-check five random leaves** against the source before delivering. On a refresh, pick them from the nodes you just changed.
+7. **Confirm the refresh landed.** Re-run `node svcmap_diff.js --state state.json cfg.js data.js ...` after the build. It should exit 2 (current), or exit 0 listing only `scan` files you deliberately chose not to map. Anything else still listed is something you missed. Give a dismissed `scan` file a line in `CHANGES.md` saying why, or it will resurface at every future refresh — and if it is dead code or unwired config, it belongs on the map as a `warn` node instead.
 
-## Step 4: Deliver
+## Step 5: Deliver
 
 - **Offline map.** `out/download/<slug>-service-map.html` is a complete page that works without a network. Open it in the browser (`open` on macOS, `xdg-open` on Linux) or hand it to the user as a file.
 - **Hosted page.** If the environment can publish HTML pages (for example artifacts on claude.ai), publish `out/<slug>-service-map.html`. It is the same map without the `<html>`/`<body>` skeleton.
-- **Reply in a few sentences:** where the files are, what the map covers, the top findings, and what is tagged to verify. Don't recap the steps.
+- **Change log (refresh only).** Prepend a dated section to `CHANGES.md` in the work folder, newest first, so the file reads as the map's history:
 
-## Step 5: Architecture Q&A pack (when requested)
+```text
+## 2026-10-26 · checkout-api a1b2c3d..f9e8d7c (14 commits)
+
+ADDED    api_rerank  step      Rerank results before paging
+UPDATED  api_pay     ext       timeout 2 s → 5 s per try
+UPDATED  retry       formula   backoff 200 ms → 500 ms (application-prod.yml:15)
+MOVED    api_cartok  ev        CheckoutService.java → CheckoutFlow.java
+REMOVED  api_pub               OrderEvents.java deleted
+
+FINDINGS
+  + [Code] 3 tries × 5 s now exceeds the 12 s load-balancer idle timeout
+  - resolved: idempotency key added, PaymentClient.java:41
+
+SCANNED  Reranker.java — built, but nothing calls it yet [Code]
+```
+
+  One line per change, naming the node id and what moved. Leave `drift` out: a shifted line number is noise, not a change. Under `FINDINGS`, `+` is new and `-` is resolved; carry both into the Q&A pack's findings register if that pack exists. Name the commit range so a reader can check the diff themselves.
+- **Reply in a few sentences:** where the files are, what the map covers, the top findings, and what is tagged to verify. Don't recap the steps. On a refresh, lead with what changed in the system, not with how many nodes you touched.
+
+## Step 6: Architecture Q&A pack (when requested)
 
 Write `<slug>-architecture-qa-pack.md` in the work folder as polished Markdown. The reader is someone who has to explain or defend this system — in onboarding, a design review, a handover or an interview. Structure:
 

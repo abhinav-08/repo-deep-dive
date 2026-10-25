@@ -9,7 +9,7 @@
     {
       "name": "repo-deep-dive",
       "source": "./plugins/repo-deep-dive",
-      "description": "Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack."
+      "description": "Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack. Re-run it after code changes and it refreshes only what moved."
     }
   ]
 }
