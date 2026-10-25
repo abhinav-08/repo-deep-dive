@@ -1,6 +1,6 @@
 {
   "name": "repo-deep-dive",
-  "description": "Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional interview Q&A pack.",
+  "description": "Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack.",
   "version": "1.0.0",
   "author": {
     "name": "Abhinav Tyagi",
@@ -8,5 +8,5 @@
   },
   "homepage": "https://github.com/abhinav-08/repo-deep-dive",
   "repository": "https://github.com/abhinav-08/repo-deep-dive",
-  "keywords": ["skill", "architecture", "service-map", "code-visualization", "interview-prep"]
+  "keywords": ["skill", "architecture", "service-map", "code-visualization", "onboarding", "code-comprehension", "interview-prep"]
 }

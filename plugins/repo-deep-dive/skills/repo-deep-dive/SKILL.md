@@ -1,6 +1,6 @@
 ---
 name: repo-deep-dive
-description: Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional interview Q&A pack.
+description: Turn a codebase into an interactive service map with decision diamonds, external calls, live formula calculators and data lineage, plus an optional architecture Q&A pack.
 ---
 
 # Repo deep dive
@@ -8,7 +8,7 @@ description: Turn a codebase into an interactive service map with decision diamo
 Turns one or more code repositories into:
 
 1. **Service map** (default). One interactive HTML page: a horizontal, collapsible tree with the system on the left and services, stages and steps opening to the right. Decisions are diamonds that open into their cases. Clicking a node opens an inspector with what happens there, the if/else in code terms, external-call cards (Elasticsearch, SQL, Kafka, Redis, HTTP, ...), live formula calculators, and what the node consumes and produces with links to producers and consumers. It also has a Formulas tab and a Data lineage table. It is delivered as one offline HTML file, and as a hosted page where the environment can publish one.
-2. **Interview Q&A pack** (when the user is preparing for an interview or asks for it). A Markdown pack grounded in the code, five parts per topic.
+2. **Architecture Q&A pack** (when the user asks for it). A Markdown pack grounded in the code, five parts per focus area. It serves onboarding, design review, handover and interview prep alike: what the system does today, the alternatives and why one wins, the cross-questions it has to survive, and the weak spots worth owning.
 
 Aim for production depth: 150 to 250 nodes, every branch point as a decision, a calculator for every formula a reader would reason about, and file:line evidence on every node.
 
@@ -24,9 +24,9 @@ The UI is already built and tested, and lives in this skill's folder. For each r
 
 - **Find the repos.** Read them from the workspace. For a GitHub URL, clone it (shallow) if the environment allows; otherwise ask the user for the code.
 - **Scope tightly.** Start from the repos the user named and follow only the calls they make into other repos. Don't scan every repo in the workspace. Read the workspace and per-repo CLAUDE.md and README files first when they exist.
-- **Deliverables.** Build the map by default. Add the interview pack when the user is preparing for interviews or asks for it. The pack needs the interview topic list or job description; if it isn't in the conversation, ask for it once.
+- **Deliverables.** Build the map by default. Add the Q&A pack when the user asks for it, whether for onboarding, a design review, a handover or interview prep. The pack needs a list of focus areas (a topic list, a job description, a review agenda); if it isn't in the conversation, ask for it once.
 - If several repos are named and the entry point is unclear, ask one question. Otherwise start working in the same reply.
-- Make a task list: read code, fact register, map data, build and check, deliver, interview pack (if wanted), verify.
+- Make a task list: read code, fact register, map data, build and check, deliver, Q&A pack (if wanted), verify.
 
 ## Step 1: Read the code into a fact register
 
@@ -165,26 +165,26 @@ mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/samp
 - **Hosted page.** If the environment can publish HTML pages (for example artifacts on claude.ai), publish `out/<slug>-service-map.html`. It is the same map without the `<html>`/`<body>` skeleton.
 - **Reply in a few sentences:** where the files are, what the map covers, the top findings, and what is tagged to verify. Don't recap the steps.
 
-## Step 5: Interview Q&A pack (when requested)
+## Step 5: Architecture Q&A pack (when requested)
 
-Write `<slug>-interview-qa-pack.md` in the work folder as polished Markdown. Structure:
+Write `<slug>-architecture-qa-pack.md` in the work folder as polished Markdown. The reader is someone who has to explain or defend this system — in onboarding, a design review, a handover or an interview. Structure:
 
-1. **Header.** Title, the repos it was built from, and the confidence labels [Code], [Inferred] and [Unknown].
+1. **Header.** Title, the repos it was built from, what the pack is for, and the confidence labels [Code], [Inferred] and [Unknown].
 2. **Confidentiality rule.** Describe the architecture, not the internals: no hostnames, model ids, internal service names, or vendor details that aren't public.
-3. **§0 What the repos don't tell you.** For each store, the read-only commands that fetch the missing facts (e.g. `_cat/indices`, `_mapping`, `\d+ table`, `kafka-topics --describe`, `INFO`). Add a table pairing each question the user will get with why the interviewer asks it.
-4. **§1 Your system on one whiteboard.** An ASCII diagram with real numbers (pods, timeouts, shards, TTLs) for the user to practise drawing in three minutes.
-5. **One section per interview topic.** Each section has five parts:
+3. **§0 What the repos don't tell you.** For each store, the read-only commands that fetch the missing facts (e.g. `_cat/indices`, `_mapping`, `\d+ table`, `kafka-topics --describe`, `INFO`). Add a table pairing each question the user will be asked with why it gets asked.
+4. **§1 Your system on one whiteboard.** An ASCII diagram with real numbers (pods, timeouts, shards, TTLs), simple enough for the user to redraw from memory in three minutes.
+5. **One section per focus area.** Each section has five parts:
    1. What your system does today, with file:line references.
    2. The alternatives and why one wins, as a table of approach, pros and cons.
    3. Cross-questions with model answers.
-   4. What to avoid saying.
+   4. What to avoid claiming, and why it doesn't hold up.
    5. Weak spots to own: findings framed as "a risk I identified and how I'd fix it".
 6. **Diagnosis drills built from their system.** Each drill goes from symptom to ranked hypotheses, to what to check, to the fix.
 7. **Findings register.** Columns: #, finding, where, severity, confidence. Never present an [Inferred] item as a confirmed bug.
-8. **Validation questions.** The interviewer's validation questions, if given, answered with pointers to the evidence above.
-9. **Prep plan.** A day-by-day plan.
+8. **Validation questions.** Any validation questions supplied by the user, answered with pointers to the evidence above.
+9. **Study plan.** A day-by-day plan for working through the pack.
 
-When the user then asks to be taught a topic, use the same five-part shape: core concepts; alternatives and why one is chosen; cross-questions; what to avoid; ties to their infra. Then offer to quiz them.
+When the user then asks to be taught a topic, use the same five-part shape: core concepts; alternatives and why one is chosen; cross-questions; what to avoid; ties to their own infrastructure. Then offer to quiz them.
 
 ## Writing rules for everything produced
 

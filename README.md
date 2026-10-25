@@ -1,6 +1,6 @@
 # repo-deep-dive
 
-A skill for Claude that reads a codebase and turns it into an interactive **service map**: a collapsible tree of services, stages, steps and decisions. Every node explains what happens there, shows the if/else from the code, the external calls it makes, live calculators for the formulas involved, and where its data comes from and goes. On request, it also writes an **interview Q&A pack** grounded in the same code.
+A skill for Claude that reads a codebase and turns it into an interactive **service map**: a collapsible tree of services, stages, steps and decisions. Every node explains what happens there, shows the if/else from the code, the external calls it makes, live calculators for the formulas involved, and where its data comes from and goes. On request, it also writes an **architecture Q&A pack** grounded in the same code.
 
 ![Service map with the inspector open on an external call](docs/map-light.png)
 
@@ -20,14 +20,14 @@ A skill for Claude that reads a codebase and turns it into an interactive **serv
 - **Navigation:** search, zoom buttons and double-click zoom (the mouse wheel scrolls the page), light and dark themes, and phone layouts.
 - **Evidence:** a confidence tag on every node (`Code`, `Docs`, `Doc`, `Inferred`, `Model`, `Unknown`), plus file:line evidence.
 
-**An interview Q&A pack** (optional), in Markdown. For each interview topic it gives five parts:
+**An architecture Q&A pack** (optional), in Markdown — for onboarding, a design review, a handover or interview prep. For each focus area it gives five parts:
 1. what your system does today;
 2. the alternatives and why one wins;
 3. cross-questions with model answers;
-4. what to avoid saying;
+4. what to avoid claiming;
 5. the weak spots worth owning.
 
-It also has a findings register, diagnosis drills and a day-by-day prep plan.
+It also has a findings register, diagnosis drills and a day-by-day study plan.
 
 To see it before installing, download [`examples/orders-service-map.html`](examples/orders-service-map.html) and open it in a browser. It's a small map built from fictional data.
 
@@ -70,6 +70,7 @@ Ask in plain language, for example:
 
 - "Map the orders-service repo end to end."
 - "Make a service map of gateway and billing, including how they call each other."
+- "Write an architecture Q&A pack for this repo, focused on caching and retries."
 - "Build interview prep from this repo. Here's the job description: ..."
 
 Claude then works through these steps:
