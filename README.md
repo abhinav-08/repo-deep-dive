@@ -112,15 +112,17 @@ To run the diff by hand:
 
 ```bash
 cd service-maps/<slug>
-node svcmap_diff.js --state state.json --out out/work-order.json cfg.js data.js nodes-*.js extra.js fx.js
+python3 svcmap_diff.py --state state.json --out out/work-order.json cfg.js data.js nodes-*.js extra.js fx.js
 ```
 
 It exits 0 with a work order, 2 when the map is already current, and 1 when a full rebuild is needed.
 
+It reads the `ev` evidence by scanning the data files rather than running them, so it needs no JavaScript engine — strings, `L` templates, comments and regex literals are skipped so braces inside a `logic` block can't throw it off. An `ev` it can't attribute to a node is reported under `warn_evWithoutOwner` rather than guessed at, and a missed one is harmless: that file just shows up under `scan` instead.
+
 ## Requirements
 
-- **Python 3** for the build script (standard library only).
-- **Node.js** for refreshes, and for the build's JavaScript syntax check. A full build works without it.
+- **Python 3** for building and refreshing maps (standard library only).
+- **Node.js** (optional). When it's installed, the build also runs a JavaScript syntax check.
 - **git** (optional). With it, a refresh maps changes down to the line; without it, down to the file.
 - **Playwright with Chromium** for the automated checks. Install it with `npm i -g playwright && npx playwright install chromium`.
 - **A current browser** to view the map. It's tested in Chromium and uses modern CSS (`:has()`, `color-mix()`). Fonts load from Google Fonts when you're online, and fall back to system fonts offline.
@@ -135,7 +137,7 @@ The page itself never changes per repo. Claude only writes data.
 | `assets/sample-data.js` | A small fictional example that uses every field. |
 | `scripts/build_svcmap.py` | Merges the template and data into the page plus an offline copy. It rejects broken data and runs a syntax check. |
 | `scripts/check_svcmap.js` | Opens the page in headless Chromium and checks it (see below), saving screenshots for review. |
-| `scripts/svcmap_diff.js` | Reads `state.json`, diffs the repos, and reports which nodes a refresh has to re-read. |
+| `scripts/svcmap_diff.py` | Reads `state.json`, diffs the repos, and reports which nodes a refresh has to re-read. |
 
 The checker covers:
 - data integrity;
@@ -194,7 +196,7 @@ plugins/repo-deep-dive/
     assets/sample-data.js
     scripts/build_svcmap.py
     scripts/check_svcmap.js
-    scripts/svcmap_diff.js
+    scripts/svcmap_diff.py
 examples/orders-service-map.html           prebuilt demo (fictional data)
 docs/                                      screenshots
 ```

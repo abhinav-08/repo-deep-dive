@@ -17,7 +17,7 @@ The UI is already built and tested, and lives in this skill's folder. For each r
 - `assets/sample-data.js`: a small fictional example that uses every field.
 - `scripts/build_svcmap.py`: merges the template and your data into the page and an offline copy, and records what the build saw.
 - `scripts/check_svcmap.js`: loads the page in headless Chromium, checks it and takes screenshots.
-- `scripts/svcmap_diff.js`: works out what a built map needs re-read after the repos moved on.
+- `scripts/svcmap_diff.py`: works out what a built map needs re-read after the repos moved on.
 
 "This skill's folder" is `${CLAUDE_SKILL_DIR}` in Claude Code. Elsewhere it is the directory this SKILL.md was loaded from.
 
@@ -31,7 +31,7 @@ A map that already exists is not rebuilt from scratch. Before reading any code, 
 
 ```bash
 cd service-maps/<slug>
-node svcmap_diff.js --state state.json --out out/work-order.json cfg.js data.js nodes-*.js extra.js fx.js
+python3 svcmap_diff.py --state state.json --out out/work-order.json cfg.js data.js nodes-*.js extra.js fx.js
 ```
 
 Act on the exit code, not just the output:
@@ -181,7 +181,7 @@ You can split large data across files, for example cfg.js, data.js, nodes-<svc>.
 
 ```bash
 SKILL="${CLAUDE_SKILL_DIR}"; WORK=service-maps/<slug>
-mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/sample-data.js "$SKILL"/scripts/build_svcmap.py "$SKILL"/scripts/check_svcmap.js "$SKILL"/scripts/svcmap_diff.js "$WORK"/ && cd "$WORK"
+mkdir -p "$WORK" && cp "$SKILL"/assets/svcmap-template.html "$SKILL"/assets/sample-data.js "$SKILL"/scripts/build_svcmap.py "$SKILL"/scripts/check_svcmap.js "$SKILL"/scripts/svcmap_diff.py "$WORK"/ && cd "$WORK"
 ```
 
 2. **Write the data files.** Start from sample-data.js, which uses every field.
@@ -211,7 +211,7 @@ python3 build_svcmap.py svcmap-template.html out/<slug>-service-map.html cfg.js 
      - `warn_evNotRepoRelative` lists evidence a refresh won't be able to map; fix each one.
 5. **Look at every screenshot** in out/shots: everything open, decision selected, inspector in light and dark, formulas, phone width.
 6. **Re-check five random leaves** against the source before delivering. On a refresh, pick them from the nodes you just changed.
-7. **Confirm the refresh landed.** Re-run `node svcmap_diff.js --state state.json cfg.js data.js ...` after the build. It should exit 2 (current), or exit 0 listing only `scan` files you deliberately chose not to map. Anything else still listed is something you missed. Give a dismissed `scan` file a line in `CHANGES.md` saying why, or it will resurface at every future refresh — and if it is dead code or unwired config, it belongs on the map as a `warn` node instead.
+7. **Confirm the refresh landed.** Re-run `python3 svcmap_diff.py --state state.json cfg.js data.js ...` after the build. It should exit 2 (current), or exit 0 listing only `scan` files you deliberately chose not to map. Anything else still listed is something you missed. Give a dismissed `scan` file a line in `CHANGES.md` saying why, or it will resurface at every future refresh — and if it is dead code or unwired config, it belongs on the map as a `warn` node instead.
 
 ## Step 5: Deliver
 
