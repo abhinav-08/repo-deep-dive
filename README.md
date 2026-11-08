@@ -8,7 +8,7 @@ A skill for Claude that reads a codebase and turns it into an interactive **serv
 
 **A service map**, as one HTML file that works offline:
 
-- **Tree:** the system sits on the left and each level opens to the right. Click the root to expand or collapse everything.
+- **Tree:** the system sits on the left and each level opens to the right, with every service's subtree inside its own labelled boundary band. Click the root to expand or collapse everything.
 - **Decisions:** drawn as diamonds that open into their cases.
 - **Inspector:** for any node, it shows:
   - what happens, in order;
@@ -16,8 +16,8 @@ A skill for Claude that reads a codebase and turns it into an interactive **serv
   - cards for external calls (Elasticsearch, SQL, Kafka, Redis, HTTP and so on), with the request, timeout, retries and cache;
   - what the node consumes and produces, with links to the producers and consumers.
 - **Calculators:** live formula calculators for scoring, decay curves, retry and backoff timelines, rate limits, cache TTLs and similar math.
-- **Data flow:** flow lines for the selected node, a Formulas tab and a Data lineage table.
-- **Navigation:** search, zoom buttons and double-click zoom (the mouse wheel scrolls the page), light and dark themes, and phone layouts.
+- **Data flow:** animated flow lines with signal dots and arrowheads for the selected node, **Trace** to dim the map to its full upstream and downstream chain, a Formulas tab and a Data lineage table.
+- **Navigation:** a minimap, search, zoom buttons and double-click zoom (the mouse wheel scrolls the page), keyboard shortcuts (`/` find, `R` trace, `M` minimap, `F` fit, `T` theme, `+`/`-`/`0` zoom), light and dark themes, and phone layouts.
 - **Evidence:** a confidence tag on every node (`Code`, `Docs`, `Doc`, `Inferred`, `Model`, `Unknown`), plus file:line evidence.
 
 **An architecture Q&A pack** (optional), in Markdown — for onboarding, a design review, a handover or interview prep. For each focus area it gives five parts:
@@ -133,7 +133,7 @@ The page itself never changes per repo. Claude only writes data.
 
 | File | Role |
 |---|---|
-| `assets/svcmap-template.html` | The page: layout, zoom, inspector, calculators, lineage. |
+| `assets/svcmap-template.html` | The page: layout, boundaries, flow animation, trace, minimap, zoom, inspector, calculators, lineage. |
 | `assets/sample-data.js` | A small fictional example that uses every field. |
 | `scripts/build_svcmap.py` | Merges the template and data into the page plus an offline copy. It rejects broken data and runs a syntax check. |
 | `scripts/check_svcmap.js` | Opens the page in headless Chromium and checks it (see below), saving screenshots for review. |
@@ -145,6 +145,7 @@ The checker covers:
 - diamond click targets;
 - zoom behavior;
 - every calculator;
+- flow animation, trace, minimap and the theme toggle;
 - light and dark themes;
 - phone width;
 - evidence paths a refresh can map.

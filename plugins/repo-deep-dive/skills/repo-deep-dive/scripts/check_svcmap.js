@@ -92,6 +92,38 @@ const fs = require('fs'), path = require('path');
   await page.click('#zFit'); await page.waitForTimeout(300);
   R.zoom = { wheelIgnored: k1 === k0, dblclickZooms: k2 > k1 * 1.5 || k2 >= 2.2 - 1e-9, readout: await page.textContent('#zReset') };
 
+  // 4b. flow animation, trace, minimap and the theme toggle
+  const flowNode = await page.evaluate(() => { const n = Object.values(byId).find(x => x.k !== 'case' && (x.in || []).length && (x.out || []).length); return n && n.id; });
+  if (flowNode) {
+    await page.evaluate(id => select(id, true), flowNode); await page.waitForTimeout(400);
+    // signal dots ride the flow paths via <animateMotion>; sample their screen position twice
+    const at = () => page.evaluate(() => [...document.querySelectorAll('.sig')].map(c => { const m = c.getScreenCTM(); return m ? Math.round(m.e) + ',' + Math.round(m.f) : ''; }));
+    const s1 = await at(); await page.waitForTimeout(500); const s2 = await at();
+    await page.click('#motionBtn'); await page.waitForTimeout(250);
+    const off = await page.evaluate(() => document.querySelectorAll('.sig').length);
+    await page.click('#motionBtn'); await page.waitForTimeout(250);
+    R.motion = { node: flowNode, signals: s1.length, signalsMove: s1.length > 0 && s1.some((v, i) => v !== s2[i]), stopsWhenOff: off === 0 };
+    await page.click('#traceBtn'); await page.waitForTimeout(450);
+    R.trace = await page.evaluate(() => ({ up: document.querySelectorAll('.nd.up').length, down: document.querySelectorAll('.nd.down').length, dimmed: document.querySelectorAll('.nd.dim').length }));
+    await shot('2b-trace.png');
+    await page.click('#traceBtn'); await page.waitForTimeout(250);
+  }
+  if (await page.isVisible('#mini')) {
+    const t0 = await page.evaluate(() => [st.tx, st.ty]);
+    const mb = await page.locator('#mini').boundingBox();
+    await page.mouse.click(mb.x + mb.width * 0.72, mb.y + mb.height * 0.6); await page.waitForTimeout(300);
+    const t1 = await page.evaluate(() => [st.tx, st.ty]);
+    R.minimap = { shown: true, pans: t0[0] !== t1[0] || t0[1] !== t1[1] };
+  } else R.minimap = { shown: false, pans: null };
+  await page.keyboard.press('t'); await page.waitForTimeout(250);
+  const th1 = await page.evaluate(() => document.documentElement.dataset.theme);
+  await page.keyboard.press('t'); await page.waitForTimeout(250);
+  const th2 = await page.evaluate(() => document.documentElement.dataset.theme);
+  R.themeToggle = { first: th1, second: th2, works: !!th1 && !!th2 && th1 !== th2 };
+  // leave the page on the viewer's own theme so the light/dark shots below mean something
+  await page.evaluate(() => { document.documentElement.removeAttribute('data-theme'); try { localStorage.removeItem(TKEY); } catch (e) {} });
+  await page.click('#zFit'); await page.waitForTimeout(250);
+
   // 5. richest node in the inspector (ext + fx + logic), light and dark
   const rich = await page.evaluate(() => { const sc = n => (n.ext ? 2 : 0) + (n.fx ? 2 : 0) + (n.logic ? 1 : 0) + (n.what ? 1 : 0);
     return Object.values(byId).filter(n => n.k !== 'case').sort((a, b) => sc(b) - sc(a))[0].id; });
@@ -117,7 +149,9 @@ const fs = require('fs'), path = require('path');
 
   const hard = errs.length || R.dup.length || R.badKind.length || R.missingD.length || R.extraOrphans.length || R.missingFx.length ||
     R.brxLenMismatch.length || R.fxErr.length || R.layout.overlaps.length || (R.diamondClick && !(R.diamondClick.centreSelects && R.diamondClick.cornerIgnored)) ||
-    !R.zoom.wheelIgnored || !R.zoom.dblclickZooms || (R.formulasTab && R.formulasTab.errorRows) || !R.phoneNoHScroll;
+    !R.zoom.wheelIgnored || !R.zoom.dblclickZooms || (R.formulasTab && R.formulasTab.errorRows) || !R.phoneNoHScroll ||
+    (R.motion && !(R.motion.signals && R.motion.signalsMove && R.motion.stopsWhenOff)) ||
+    (R.trace && !(R.trace.up + R.trace.down)) || (R.minimap.shown && !R.minimap.pans) || !R.themeToggle.works;
   console.log(JSON.stringify(R, null, 1));
   console.log(hard ? 'RESULT: FAIL' : 'RESULT: PASS', '| screenshots in', out);
   await browser.close(); process.exit(hard ? 1 : 0);

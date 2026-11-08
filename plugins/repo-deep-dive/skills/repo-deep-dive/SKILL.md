@@ -7,7 +7,7 @@ description: Turn a codebase into an interactive service map with decision diamo
 
 Turns one or more code repositories into:
 
-1. **Service map** (default). One interactive HTML page: a horizontal, collapsible tree with the system on the left and services, stages and steps opening to the right. Decisions are diamonds that open into their cases. Clicking a node opens an inspector with what happens there, the if/else in code terms, external-call cards (Elasticsearch, SQL, Kafka, Redis, HTTP, ...), live formula calculators, and what the node consumes and produces with links to producers and consumers. It also has a Formulas tab and a Data lineage table. It is delivered as one offline HTML file, and as a hosted page where the environment can publish one.
+1. **Service map** (default). One interactive HTML page: a horizontal, collapsible tree with the system on the left and services, stages and steps opening to the right. Each service's subtree sits inside its own labelled boundary band; nodes are cards with a kind glyph, a kind label and status pills; decisions are diamonds that open into their cases. Clicking a node opens an inspector with what happens there, the if/else in code terms, external-call cards (Elasticsearch, SQL, Kafka, Redis, HTTP, ...), live formula calculators, and what the node consumes and produces with links to producers and consumers. Data-flow links are drawn as animated lines with signal dots and arrowheads, and **Trace** dims the map to the selected node's full upstream and downstream chain. It also has a minimap, a Formulas tab and a Data lineage table. It is delivered as one offline HTML file, and as a hosted page where the environment can publish one.
 2. **Architecture Q&A pack** (when the user asks for it). A Markdown pack grounded in the code, five parts per focus area. It serves onboarding, design review, handover and interview prep alike: what the system does today, the alternatives and why one wins, the cross-questions it has to survive, and the weak spots worth owning.
 
 Aim for production depth: 150 to 250 nodes, every branch point as a decision, a calculator for every formula a reader would reason about, and file:line evidence on every node.
@@ -150,7 +150,18 @@ Combine them when a claim is mixed, e.g. "Code + Inferred".
     - a `note` saying what the model leaves out.
 - `warn`: known issues and risks, one sentence each.
 
-**First view and footer.** `CFG.open` and `CFG.sel` should land the first view on a rich leaf. `CFG.foot` names the repos read, what isn't in them, and the confidence tags.
+**First view and footer.** `CFG.open` and `CFG.sel` should land the first view on a rich leaf — ideally one with both `in` and `out`, so the animated flow lines and the Trace counts are visible the moment the page opens. `CFG.foot` names the repos read, what isn't in them, and the confidence tags.
+
+**What the chrome gives you for free.** You don't build any of this; you earn it by filling the data well.
+
+| Feature | What drives it |
+|---|---|
+| Service boundary bands | a `k:"service"` node with kids. Keep one service per deployable and the bands stay readable. |
+| Kind glyph and kind label on every card | `k`. Nothing to write. |
+| Animated flow lines, signal dots, arrowheads | `in` / `out` on the selected node, resolved through `D`. |
+| Trace (upstream / downstream reach) | the transitive closure of `in` / `out`. Shallow `D` coverage makes Trace useless, so put every value that crosses a step boundary in `D`. |
+| Minimap | the layout. Nothing to write. |
+| Copy-to-clipboard evidence chips | `ev`, split on commas. One more reason to keep each reference repo-relative. |
 
 ### Data contract
 
@@ -158,7 +169,7 @@ The data files must declare `CFG`, `D`, `N`, `EXTRA` and `FX`; use `{}` when one
 
 | Object | Fields | Notes |
 |---|---|---|
-| `CFG` | `title`, `kicker`, `find`, `key`, `open[]`, `sel`, `lede?`, `foot?` | `lede` and `foot` accept simple HTML. `key` namespaces the remembered selection. |
+| `CFG` | `title`, `kicker`, `find`, `key`, `open[]`, `sel`, `lede?`, `foot?`, `motion?`, `mini?` | `lede` and `foot` accept simple HTML. `key` namespaces the remembered selection and the remembered theme. `motion:false` ships the map with the flow animation off; `mini:false` ships it with the minimap off. Both stay toggleable in the page, and motion is forced off under `prefers-reduced-motion`. |
 | `D[key]` | `n`, `d`, `s?` | Name, what it is, and a shape or example (shown as code). |
 | node in `N` | `id`, `k`, `t`, `s?`, `d?`, `kids?`, `in?`, `out?`, `calls?`, `br?`, `ev?`, `c?`, `warn?`, `uses?` | `k` is one of system, service, stage, step, decision, store, external. `ev` holds repo-relative file:line evidence. `uses` says how the output is used. |
 | `EXTRA[id]` | `what[]`, `logic`, `ext`, `fx[]`, `brx[]`, `warn`, `uses`, `ev`, `c`, `patch{}` | Merged into the node at load. `patch` overrides any base field. |
@@ -209,7 +220,7 @@ python3 build_svcmap.py svcmap-template.html out/<slug>-service-map.html cfg.js 
      - an input with no producer, other than the entry request, means a missing node or data link;
      - long titles get cut;
      - `warn_evNotRepoRelative` lists evidence a refresh won't be able to map; fix each one.
-5. **Look at every screenshot** in out/shots: everything open, decision selected, inspector in light and dark, formulas, phone width.
+5. **Look at every screenshot** in out/shots: everything open, decision selected, trace, inspector in light and dark, formulas, phone width. On the all-open shot check that each service band encloses only its own subtree and that no pill row is clipped; on the trace shot check that the chain the map lights up is the one you'd expect from the code.
 6. **Re-check five random leaves** against the source before delivering. On a refresh, pick them from the nodes you just changed.
 7. **Confirm the refresh landed.** Re-run `python3 svcmap_diff.py --state state.json cfg.js data.js ...` after the build. It should exit 2 (current), or exit 0 listing only `scan` files you deliberately chose not to map. Anything else still listed is something you missed. Give a dismissed `scan` file a line in `CHANGES.md` saying why, or it will resurface at every future refresh — and if it is dead code or unwired config, it belongs on the map as a `warn` node instead.
 
@@ -275,4 +286,9 @@ When the user then asks to be taught a topic, use the same five-part shape: core
 - **Dark-mode contrast.** Text on accent fills uses `--onaccent`.
 - **`fmt` keeps integer zeros.** An earlier version turned 540 into 54.
 - **Diamond decisions.** Decisions are 96 px diamonds, the layout handles mixed node heights, and only clicks inside the diamond select it.
+- **Service bands need breathing room.** `layout()` adds `SG` after every service subtree so two boundary bands can never overlap. Shrinking it brings the overlap back.
+- **Flow animation is CSS plus SMIL.** The dashes move with a `stroke-dashoffset` keyframe; the signal dots are `<circle><animateMotion><mpath href="#fpN">`, so every flow path needs its generated id. Both are skipped under `prefers-reduced-motion` and behind the Motion toggle — don't drive them from a JS timer.
+- **The minimap and the hint are click-dead.** Both are in the pan guard and the double-click guard, so dragging or double-clicking the canvas still works over them. Anything new pinned inside `.mapstage` has to join those two selectors.
+- **Trace works on representatives.** A traced node that's collapsed is badged through `repOf`, and every ancestor of a traced node is kept lit, so the chain never disappears into a dimmed parent.
+- **Theme is a stamped attribute.** The T key writes `data-theme` on `<html>` and remembers it. Every colour must be defined on bare `:root` first, then overridden under both `@media (prefers-color-scheme: dark)` and `:root[data-theme="dark"]`, or the toggle only works one way.
 - **Changing the template.** For a change every map should get, edit `assets/svcmap-template.html`, then rebuild the sample data and rerun the checker before using it.
